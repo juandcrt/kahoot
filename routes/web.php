@@ -44,10 +44,24 @@ Route::middleware(['auth', 'verified'])->prefix('dashboard/profesor')->group(fun
 
         return view('cuestionario.salas', compact('salas'));
     })->name('profesor.salas');
+
+    // Módulo para Proyectar Sala en tiempo real
+    Route::get('/proyectar/{id}', function ($id) {
+        $user = Auth::user();
+        if ($user->role !== 'docente' && $user->role !== 'admin') {
+            return redirect('/dashboard/estudiante');
+        }
+
+        $sala = SalaJuego::with('cuestionario')->findOrFail($id);
+
+        return view('proyectar.proyectar_sala', compact('sala'));
+    })->name('profesor.proyectar');
 });
 
-// 3. Dashboard Estudiante y Acceso a Salas por PIN
+// 3. Dashboard Estudiante, Acceso a Salas por PIN y Skins
 Route::middleware(['auth', 'verified'])->prefix('dashboard/estudiante')->group(function () {
+    
+    // Panel principal de estudiante
     Route::get('/', function () {
         $user = Auth::user();
         if ($user->role === 'docente' || $user->role === 'admin') {
@@ -55,6 +69,16 @@ Route::middleware(['auth', 'verified'])->prefix('dashboard/estudiante')->group(f
         }
         return view('Interfaz_estudiante.estudiante');
     })->name('dashboard.estudiante');
+
+    // Vista de formulario para ingresar PIN (Apunta a PIN/index.blade.php)
+    Route::get('/pin', function () {
+        return view('PIN.index');
+    })->name('estudiante.pin');
+
+    // Vista de personalización de Skins (Apunta a skins/index.blade.php)
+    Route::get('/skins', function () {
+        return view('skins.index');
+    })->name('estudiante.skins');
 });
 
 Route::post('/estudiante/unirse', function (Request $request) {

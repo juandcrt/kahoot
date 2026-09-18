@@ -130,12 +130,12 @@
                 @foreach($salas as $sala)
                     <div class="sala-row">
                         <div>
-                            <h4 style="font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 5px;">{{ $sala->cuestionario->titulo }}</h4>
+                            <h4 style="font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 5px;">{{ $sala->cuestionario->titulo ?? 'Cuestionario sin título' }}</h4>
                             <span style="font-size: 13px; color: rgba(255,255,255,0.6);">Estado: <strong style="color: #4ade80;">{{ ucfirst($sala->estado) }}</strong></span>
                         </div>
                         <div style="display: flex; align-items: center; gap: 20px;">
                             <div class="pin-badge">{{ $sala->pin }}</div>
-                            <a href="#" class="kahoot-action-btn">Proyectar Sala</a>
+                            <a href="{{ route('profesor.proyectar', $sala->id) }}" class="kahoot-action-btn">Proyectar Sala</a>
                         </div>
                     </div>
                 @endforeach

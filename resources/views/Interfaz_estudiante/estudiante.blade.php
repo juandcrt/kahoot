@@ -76,7 +76,24 @@
             text-decoration: none;
         }
 
-        .user-info { display: flex; align-items: center; gap: 15px; }
+        .user-profile-widget {
+            display: flex; align-items: center; gap: 12px;
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            padding: 6px 16px 6px 6px;
+            border-radius: 50px;
+            backdrop-filter: blur(10px);
+        }
+
+        .profile-avatar-circle {
+            width: 42px; height: 42px;
+            background: linear-gradient(135deg, #ffa602 0%, #e21b3c 100%);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            border: 2px solid rgba(255,255,255,0.4);
+        }
 
         .logout-btn {
             background: rgba(226, 27, 60, 0.2);
@@ -110,12 +127,11 @@
 
         .kahoot-action-btn {
             display: inline-block; text-align: center;
-            background: linear-gradient(135deg, #1368ce 0%, #0d4fa4 100%);
             color: white; font-weight: 700; font-size: 14px;
             padding: 10px 20px; border-radius: 10px; text-decoration: none;
-            box-shadow: 0 4px 0 #0a3870; transition: all 0.1s ease;
+            transition: all 0.1s ease;
         }
-        .kahoot-action-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #0a3870; }
+        .kahoot-action-btn:active { transform: translateY(2px); }
     </style>
 </head>
 <body>
@@ -130,10 +146,16 @@
         <!-- Barra de Navegación -->
         <div class="dash-nav">
             <a href="#" class="dash-logo">Kahoot! 2.0 (Estudiante)</a>
-            <div class="user-info">
-                <span style="font-weight: 600; font-size: 15px; color: rgba(255,255,255,0.9);">
-                    Hola, {{ Auth::user()->name }}
-                </span>
+            
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <!-- Widget de Perfil (Solo nombre de usuario y círculo con skin) -->
+                <div class="user-profile-widget">
+                    <div class="profile-avatar-circle" id="nav-skin-emoji">🦊</div>
+                    <div style="display: flex; flex-direction: column; text-align: left; padding-right: 8px;">
+                        <span style="font-weight: 700; font-size: 15px; color: var(--ivory);">{{ Auth::user()->name }}</span>
+                    </div>
+                </div>
+
                 <a href="{{ route('logout') }}" class="logout-btn">Cerrar Sesión</a>
             </div>
         </div>
@@ -155,17 +177,27 @@
                 <div class="action-card">
                     <div class="action-title">Unirse con PIN</div>
                     <div class="action-desc">Coloca el código que dictó tu profesor para entrar a la sala en tiempo real y competir.</div>
-                    <a href="#" class="kahoot-action-btn" style="background: linear-gradient(135deg, #e21b3c 0%, #b3122e 100%); box-shadow: 0 4px 0 #800c1e;">Ingresar PIN</a>
+                    <a href="{{ route('estudiante.pin') }}" class="kahoot-action-btn" style="background: linear-gradient(135deg, #e21b3c 0%, #b3122e 100%); box-shadow: 0 4px 0 #800c1e; width: 100%;">Ingresar PIN</a>
                 </div>
 
                 <div class="action-card">
                     <div class="action-title">Personalizar Skins</div>
                     <div class="action-desc">Elige y desbloquea aspectos divertidos para destacar en tus partidas grupales.</div>
-                    <a href="#" class="kahoot-action-btn" style="background: linear-gradient(135deg, #ffa602 0%, #d98b00 100%); box-shadow: 0 4px 0 #9e6400;">Mis Skins</a>
+                    <a href="{{ route('estudiante.skins') }}" class="kahoot-action-btn" style="background: linear-gradient(135deg, #ffa602 0%, #d98b00 100%); box-shadow: 0 4px 0 #9e6400; color: #2a0b5c; width: 100%;">Mis Skins</a>
                 </div>
             </div>
         </div>
     </div>
 
+    <script>
+        // Cargar la skin guardada en localStorage al abrir el panel principal
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedEmoji = localStorage.getItem('selectedSkinEmoji');
+            if (savedEmoji) {
+                const emojiElement = document.getElementById('nav-skin-emoji');
+                if (emojiElement) emojiElement.innerText = savedEmoji;
+            }
+        });
+    </script>
 </body>
 </html>
