@@ -124,6 +124,12 @@
             <h2 style="font-size: 26px; font-weight: 800; margin-bottom: 5px;">Salas Activas y PINes</h2>
             <p style="color: rgba(255,255,255,0.7); font-size: 14px; margin-bottom: 25px;">Comparte el PIN de 6 dígitos con tus alumnos para que puedan ingresar desde su panel.</p>
 
+            @if(session('success'))
+                <div style="background: rgba(74, 222, 128, 0.2); border: 1px solid #4ade80; color: #4ade80; padding: 12px 20px; border-radius: 12px; margin-bottom: 20px; font-weight: 600;">
+                    {{ session('success') }}
+                </div>
+            @endif
+
             @if($salas->isEmpty())
                 <p style="text-align: center; color: rgba(255,255,255,0.5); padding: 40px 0;">No hay salas activas todavía. Crea un cuestionario para generar tu primer PIN.</p>
             @else
@@ -133,9 +139,18 @@
                             <h4 style="font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 5px;">{{ $sala->cuestionario->titulo ?? 'Cuestionario sin título' }}</h4>
                             <span style="font-size: 13px; color: rgba(255,255,255,0.6);">Estado: <strong style="color: #4ade80;">{{ ucfirst($sala->estado) }}</strong></span>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 20px;">
+                        <div style="display: flex; align-items: center; gap: 15px;">
                             <div class="pin-badge">{{ $sala->pin }}</div>
                             <a href="{{ route('profesor.proyectar', $sala->id) }}" class="kahoot-action-btn">Proyectar Sala</a>
+                            
+                            <!-- Botón de eliminar con la X -->
+                            <form action="{{ route('salas.destruir', $sala->id) }}" method="POST" onsubmit="return confirm('¿Estás seguro de eliminar esta sala?');" style="margin: 0;">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" style="background: rgba(226, 27, 60, 0.2); border: 1px solid var(--kahoot-pink); color: white; width: 38px; height: 38px; border-radius: 10px; cursor: pointer; font-weight: bold; display: flex; align-items: center; justify-content: center; transition: background 0.2s;" title="Eliminar sala">
+                                    ✕
+                                </button>
+                            </form>
                         </div>
                     </div>
                 @endforeach

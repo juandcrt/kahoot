@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\CuestionarioController;
+use App\Http\Controllers\SalaController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -56,6 +57,9 @@ Route::middleware(['auth', 'verified'])->prefix('dashboard/profesor')->group(fun
 
         return view('proyectar.proyectar_sala', compact('sala'));
     })->name('profesor.proyectar');
+
+    // RUTA LIMPIA: Apunta al método destroy del SalaController
+    Route::delete('/salas/{id}', [SalaController::class, 'destroy'])->name('salas.destruir');
 });
 
 // 3. Dashboard Estudiante, Acceso a Salas por PIN y Skins
@@ -70,17 +74,18 @@ Route::middleware(['auth', 'verified'])->prefix('dashboard/estudiante')->group(f
         return view('Interfaz_estudiante.estudiante');
     })->name('dashboard.estudiante');
 
-    // Vista de formulario para ingresar PIN (Apunta a PIN/index.blade.php)
+    // Vista de formulario para ingresar PIN
     Route::get('/pin', function () {
         return view('PIN.index');
     })->name('estudiante.pin');
 
-    // Vista de personalización de Skins (Apunta a skins/index.blade.php)
+    // Vista de personalización de Skins
     Route::get('/skins', function () {
         return view('skins.index');
     })->name('estudiante.skins');
 });
 
+// RUTA CORREGIDA: Registra al alumno y le pasa la sala a la vista
 Route::post('/estudiante/unirse', function (Request $request) {
     $pin = $request->input('pin');
     $sala = SalaJuego::where('pin', $pin)->where('estado', 'activa')->first();
@@ -89,8 +94,20 @@ Route::post('/estudiante/unirse', function (Request $request) {
         return back()->withErrors(['pin' => 'El PIN ingresado no es válido o la sala está cerrada.']);
     }
 
-    return view('Interfaz_estudiante.sala_activa', ['sala' => $sala]);
+    // REGISTRA AL USUARIO REAL EN LA SALA
+    $sala->usuarios()->syncWithoutDetaching([Auth::id()]);
+
+    return view('Interfaz_estudiante.sala_activa', compact('sala'));
 })->middleware(['auth', 'verified'])->name('estudiante.unirse');
+
+// RUTA API AÑADIDA: Devuelve el total de conectados para el profesor
+Route::get('/api/sala/{id}/participantes', function ($id) {
+    $sala = SalaJuego::with('usuarios')->findOrFail($id);
+
+    return response()->json([
+        'total' => $sala->usuarios->count(),
+    ]);
+})->middleware(['auth', 'verified']);
 
 // 4. Ruta inteligente genérica de redirección por rol
 Route::get('/dashboard', function () {

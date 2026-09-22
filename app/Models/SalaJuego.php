@@ -15,4 +15,12 @@ class SalaJuego extends Model
     {
         return $this->belongsTo(Cuestionario::class);
     }
+
+    // Relación con los estudiantes conectados a la sala
+    public function usuarios()
+    {
+        return $this->belongsToMany(User::class, 'sala_user', 'sala_juego_id', 'user_id')
+                    ->withPivot('skin')
+                    ->withTimestamps();
+    }
 }

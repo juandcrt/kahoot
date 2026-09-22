@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Iniciar Sesión — Kahoot 2.0</title>
+    <title>Iniciar Sesión — I.E. Tungasuca</title>
     <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
@@ -30,7 +30,7 @@
             position: relative;
         }
 
-        /* ── ORBES FLOTANTES ATMOSFÉRICOS (Inspirados en tu diseño) ── */
+        /* ── ORBES FLOTANTES ATMOSFÉRICOS ── */
         .bg-orbs {
             position: fixed; inset: 0; z-index: 0; pointer-events: none;
             background: radial-gradient(circle at 50% 20%, #6830cc 0%, #2a0b5c 60%, #120324 100%);
@@ -50,7 +50,7 @@
             100% { transform: translate(-20px, 30px) scale(0.95); }
         }
 
-        /* ── TARJETA DE CRISTAL LÍQUIDO (Glassmorphism) ── */
+        /* ── TARJETA DE CRISTAL LÍQUIDO ── */
         .glass-card {
             position: relative; z-index: 10;
             background: rgba(255, 255, 255, 0.08);
@@ -86,7 +86,7 @@
             box-shadow: 0 0 0 4px rgba(255, 166, 2, 0.2);
         }
 
-        /* ── BOTÓN 3D ESTILO KAHOOT CON TOQUE PREMIUM ── */
+        /* ── BOTÓN 3D ESTILO KAHOOT ── */
         .kahoot-btn {
             background: linear-gradient(135deg, #1368ce 0%, #0d4fa4 100%);
             color: white;
@@ -103,9 +103,7 @@
             box-shadow: 0 6px 0 #0a3870, 0 10px 20px rgba(0,0,0,0.3);
             transition: all 0.15s ease;
         }
-        .kahoot-btn:hover {
-            filter: brightness(1.1);
-        }
+        .kahoot-btn:hover { filter: brightness(1.1); }
         .kahoot-btn:active {
             transform: translateY(4px);
             box-shadow: 0 2px 0 #0a3870, 0 5px 10px rgba(0,0,0,0.3);
@@ -126,14 +124,19 @@
         <div class="orb o3"></div>
     </div>
 
-    <!-- Tarjeta Centralizada tipo Glassmorphism -->
+    <!-- Tarjeta Centralizada -->
     <div class="glass-card">
         <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 30%, #ffa602 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0 0 4px 0;">Kahoot!</h1>
-            <p style="color: rgba(255,255,255,0.6); font-weight: 400; font-size: 14px; margin: 0;">Plataforma Educativa 2.0</p>
+            <h1 style="font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 30%, #ffa602 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0 0 4px 0;">I.E. TUNGASUCA</h1>
+            <p style="color: rgba(255,255,255,0.6); font-weight: 400; font-size: 14px; margin: 0;">Sistema de Gestión Escolar</p>
         </div>
 
-        <x-auth-session-status class="mb-4" :status="session('status')" />
+        <!-- Mensajes de Estado / Error generales -->
+        @if (session('status'))
+            <div style="margin-bottom: 16px; padding: 10px; background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.4); border-radius: 8px; font-size: 13px; color: #86efac;">
+                {{ session('status') }}
+            </div>
+        @endif
 
         <form method="POST" action="{{ route('login') }}">
             @csrf
@@ -141,15 +144,19 @@
             <!-- Email Address -->
             <div style="margin-bottom: 20px;">
                 <label for="email" class="form-label">Correo institucional</label>
-                <input id="email" class="glass-input" type="email" name="email" value="{{ old('email') }}" required autofocus placeholder="tucorreo@senati.pe" />
-                <x-input-error :messages="$errors->get('email')" style="color: #ff6b81; font-weight: 600; font-size: 12px; margin-top: 6px;" />
+                <input id="email" class="glass-input" type="email" name="email" value="{{ old('email') }}" required autofocus placeholder="tucorreo@tungasuca.edu.pe" />
+                @error('email')
+                    <span style="color: #ff6b81; font-weight: 600; font-size: 12px; margin-top: 6px; display: block;">{{ $message }}</span>
+                @enderror
             </div>
 
             <!-- Password -->
             <div style="margin-bottom: 20px;">
                 <label for="password" class="form-label">Contraseña</label>
                 <input id="password" class="glass-input" type="password" name="password" required autocomplete="current-password" placeholder="••••••••" />
-                <x-input-error :messages="$errors->get('password')" style="color: #ff6b81; font-weight: 600; font-size: 12px; margin-top: 6px;" />
+                @error('password')
+                    <span style="color: #ff6b81; font-weight: 600; font-size: 12px; margin-top: 6px; display: block;">{{ $message }}</span>
+                @enderror
             </div>
 
             <!-- Remember Me & Forgot Password -->
@@ -160,7 +167,7 @@
                 </label>
 
                 @if (Route::has('password.request'))
-                    <a href="{{ route('password.request')" style="font-weight: 600; color: #ffa602; text-decoration: none; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
+                    <a href="{{ route('password.request') }}" style="font-weight: 600; color: #ffa602; text-decoration: none; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
                         ¿Olvidaste tu clave?
                     </a>
                 @endif

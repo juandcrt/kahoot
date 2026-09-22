@@ -68,12 +68,12 @@
             <h2 style="font-size: 28px; font-weight: 800; margin-bottom: 5px; color: var(--kahoot-gold);">Personalizar Skins 🎨</h2>
             <p style="color: rgba(255,255,255,0.7); font-size: 14px;">Elige tu aspecto favorito para destacar en las salas de juego grupales.</p>
 
-            <div class="skins-grid">
+            <div class="skins-grid" id="skins-container">
                 <!-- Skin 1 -->
-                <div class="skin-card active" data-skin="Zorro Espacial" data-emoji="🦊">
+                <div class="skin-card" data-skin="Zorro Espacial" data-emoji="🦊">
                     <div class="skin-avatar">🦊</div>
                     <div style="font-weight: 700; font-size: 16px;">Zorro Espacial</div>
-                    <div class="equipped-text">Equipado</div>
+                    <button class="equip-btn" onclick="equiparSkin(this)">Equipar</button>
                 </div>
 
                 <!-- Skin 2 -->
@@ -115,31 +115,54 @@
     </div>
 
     <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Si no hay skin guardada por defecto, asignamos el Zorro Espacial como inicial
+            if (!localStorage.getItem('selectedSkinName')) {
+                localStorage.setItem('selectedSkinName', 'Zorro Espacial');
+                localStorage.setItem('selectedSkinEmoji', '🦊');
+            }
+
+            const savedName = localStorage.getItem('selectedSkinName');
+
+            // Recorrer las tarjetas y marcar la que coincida con el localStorage
+            document.querySelectorAll('.skin-card').forEach(card => {
+                const cardName = card.getAttribute('data-skin');
+                const btn = card.querySelector('.equip-btn');
+
+                if (cardName === savedName) {
+                    card.classList.add('active');
+                    if (btn) {
+                        btn.remove();
+                        const textDiv = document.createElement('div');
+                        textDiv.className = 'equipped-text';
+                        textDiv.innerText = 'Equipado';
+                        card.appendChild(textDiv);
+                    }
+                }
+            });
+        });
+
         function equiparSkin(button) {
-            // Obtener la tarjeta actual
             const selectedCard = button.closest('.skin-card');
             const skinName = selectedCard.getAttribute('data-skin');
             const skinEmoji = selectedCard.getAttribute('data-emoji');
 
-            // Guardar en localStorage para que el panel principal lo recuerde
+            // Guardar en localStorage
             localStorage.setItem('selectedSkinName', skinName);
             localStorage.setItem('selectedSkinEmoji', skinEmoji);
 
-            // Quitar el estado activo y restaurar botones de todas las tarjetas
+            // Restablecer todas las tarjetas a estado normal con botón "Equipar"
             document.querySelectorAll('.skin-card').forEach(card => {
                 card.classList.remove('active');
-                const btnOrText = card.querySelector('.equip-btn, .equipped-text');
-                if (btnOrText) {
-                    if (btnOrText.classList.contains('equipped-text')) {
-                        // Reemplazar texto de equipado por botón de equipar
-                        const parent = btnOrText.parentElement;
-                        btnOrText.remove();
-                        const newBtn = document.createElement('button');
-                        newBtn.className = 'equip-btn';
-                        newBtn.innerText = 'Equipar';
-                        newBtn.onclick = function() { equiparSkin(newBtn); };
-                        parent.appendChild(newBtn);
-                    }
+                const textOrBtn = card.querySelector('.equip-btn, .equipped-text');
+                if (textOrBtn && textOrBtn.classList.contains('equipped-text')) {
+                    const parent = textOrBtn.parentElement;
+                    textOrBtn.remove();
+                    const newBtn = document.createElement('button');
+                    newBtn.className = 'equip-btn';
+                    newBtn.innerText = 'Equipar';
+                    newBtn.onclick = function() { equiparSkin(newBtn); };
+                    parent.appendChild(newBtn);
                 }
             });
 
@@ -147,7 +170,6 @@
             selectedCard.classList.add('active');
             button.remove();
 
-            // Agregar texto de equipado
             const textDiv = document.createElement('div');
             textDiv.className = 'equipped-text';
             textDiv.innerText = 'Equipado';

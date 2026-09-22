@@ -1,4 +1,4 @@
-    <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -86,14 +86,28 @@
                 <div style="font-size: 64px; font-weight: 800; color: var(--kahoot-gold); letter-spacing: 8px;">{{ $sala->pin }}</div>
             </div>
 
+            <!-- Contador dinámico conectado al ID -->
             <div style="margin-top: 40px; font-size: 15px; color: rgba(255,255,255,0.7);">
-                Alumnos en la sala: <strong style="color: var(--kahoot-gold); font-size: 18px;">0</strong> (Esperando conexiones...)
+                Alumnos en la sala: <strong id="contador-alumnos" style="color: var(--kahoot-gold); font-size: 18px;">0</strong> (Conectados en tiempo real...)
             </div>
         </div>
     </div>
 
     <!-- Pie de página vacío para centrar balance -->
     <div></div>
+
+    <!-- Script de actualización en tiempo real estilo Kahoot -->
+    <script>
+        setInterval(function() {
+            fetch('/api/sala/{{ $sala->id }}/participantes')
+                .then(response => response.json())
+                .then(data => {
+                    // Actualiza automáticamente el número total de alumnos registrados en la base de datos
+                    document.getElementById('contador-alumnos').innerText = data.total;
+                })
+                .catch(error => console.error('Error al actualizar alumnos:', error));
+        }, 2000); // Se ejecuta cada 2 segundos
+    </script>
 
 </body>
 </html>
