@@ -36,14 +36,16 @@
         }
         .back-btn {
             display: inline-block;
+            width: 100%;
             margin-top: 25px;
             background: rgba(226, 27, 60, 0.2);
             border: 1px solid rgba(226, 27, 60, 0.4);
             color: #ff8595;
-            padding: 10px 20px;
+            padding: 12px 20px;
             border-radius: 10px;
             font-weight: 600;
             text-decoration: none;
+            cursor: pointer;
             transition: background 0.2s;
         }
         .back-btn:hover { background: rgba(226, 27, 60, 0.4); color: white; }
@@ -59,8 +61,29 @@
         <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 20px; font-size: 14px; color: rgba(255,255,255,0.7);">
             Esperando a que el profesor inicie el cuestionario en tiempo real...
         </div>
-        <a href="{{ route('dashboard.estudiante') }}" class="back-btn">Salir de la Sala</a>
+
+        <!-- FORMULARIO DE SALIDA QUE ENVÍA EL PIN POR POST -->
+        <form action="{{ route('estudiante.salir') }}" method="POST">
+            @csrf
+            <input type="hidden" name="pin" value="{{ $sala->pin }}">
+            <button type="submit" class="back-btn">Salir de la Sala</button>
+        </form>
     </div>
+
+    <!-- SCRIPT DE WEBSOCKETS PARA ESCUCHAR EL INICIO DE LA PARTIDA -->
+    <script type="module">
+        const pinSala = "{{ $sala->pin }}";
+        console.log("Escuchando inicio de partida en sala." + pinSala);
+
+        if (typeof window.Echo !== 'undefined') {
+            window.Echo.channel(`sala.${pinSala}`)
+                .listen('.PartidaIniciada', (evento) => {
+                    console.log("¡El profesor ha dado inicio al cuestionario!", evento);
+                    // Redirige automáticamente al estudiante a la vista de juego de la sala
+                    window.location.href = "{{ route('estudiante.juego', $sala->pin) }}";
+                });
+        }
+    </script>
 
 </body>
 </html>

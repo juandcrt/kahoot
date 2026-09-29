@@ -60,6 +60,28 @@
             border: 1px solid rgba(255,255,255,0.1);
         }
         .back-btn:hover { background: rgba(255, 255, 255, 0.1); }
+        .alumno-badge {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 18px;
+        }
+        .start-btn {
+            background: #26890c;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 20px;
+            font-weight: 800;
+            border-radius: 12px;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            transition: background 0.2s;
+        }
+        .start-btn:hover {
+            background: #1e6d09;
+        }
     </style>
 </head>
 <body>
@@ -86,27 +108,78 @@
                 <div style="font-size: 64px; font-weight: 800; color: var(--kahoot-gold); letter-spacing: 8px;">{{ $sala->pin }}</div>
             </div>
 
-            <!-- Contador dinámico conectado al ID -->
-            <div style="margin-top: 40px; font-size: 15px; color: rgba(255,255,255,0.7);">
-                Alumnos en la sala: <strong id="contador-alumnos" style="color: var(--kahoot-gold); font-size: 18px;">0</strong> (Conectados en tiempo real...)
+            <!-- Contador dinámico conectado a la base de datos -->
+            <div style="margin-top: 30px; font-size: 15px; color: rgba(255,255,255,0.7);">
+                Alumnos en la sala: <strong id="contador-alumnos" style="color: var(--kahoot-gold); font-size: 18px;">{{ $sala->alumnos()->count() }}</strong>
+            </div>
+
+            <!-- Lista de alumnos usando PHP nativo seguro -->
+            <ul id="lista-alumnos" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; list-style: none; margin-top: 15px; padding: 0;">
+                <?php foreach ($sala->alumnos as$alumno): ?>
+                    <li class="alumno-badge"><?= htmlspecialchars($alumno->name ?? $alumno->nickname ?? 'Estudiante') ?></li>
+                <?php endforeach; ?>
+            </ul>
+
+            <!-- BOTÓN DE INICIO DE RONDA PARA EL PROFESOR -->
+            <div style="margin-top: 35px;">
+                <form action="{{ route('profesor.iniciar', $sala->id) }}" method="POST">
+                    @csrf
+                    <button type="submit" class="start-btn">
+                        ¡Iniciar Cuestionario 🚀!
+                    </button>
+                </form>
             </div>
         </div>
     </div>
 
-    <!-- Pie de página vacío para centrar balance -->
+    <!-- Pie de página -->
     <div></div>
 
-    <!-- Script de actualización en tiempo real estilo Kahoot -->
-    <script>
-        setInterval(function() {
-            fetch('/api/sala/{{ $sala->id }}/participantes')
-                .then(response => response.json())
-                .then(data => {
-                    // Actualiza automáticamente el número total de alumnos registrados en la base de datos
-                    document.getElementById('contador-alumnos').innerText = data.total;
+    <!-- SCRIPT DE WEBSOCKETS (ENTRADA Y SALIDA EN TIEMPO REAL) -->
+    <script type="module">
+        const pinSala = "{{ $sala->pin }}";
+        console.log("Conectando al canal de WebSockets: sala." + pinSala);
+
+        if (typeof window.Echo !== 'undefined') {
+            window.Echo.channel(`sala.${pinSala}`)
+                .listen('.AlumnoUnido', (evento) => {
+                    console.log("¡Evento de alumno unido recibido!", evento);
+
+                    let lista = document.getElementById('lista-alumnos');
+                    let yaExiste = Array.from(lista.children).some(li => li.innerText.trim() === evento.nombreAlumno.trim());
+
+                    if (!yaExiste) {
+                        let contador = document.getElementById('contador-alumnos');
+                        let valorActual = parseInt(contador.innerText) || 0;
+                        contador.innerText = valorActual + 1;
+
+                        let nuevoAlumno = document.createElement('li');
+                        nuevoAlumno.innerText = evento.nombreAlumno;
+                        nuevoAlumno.className = 'alumno-badge';
+                        lista.appendChild(nuevoAlumno);
+                    }
                 })
-                .catch(error => console.error('Error al actualizar alumnos:', error));
-        }, 2000); // Se ejecuta cada 2 segundos
+                .listen('.AlumnoSalio', (evento) => {
+                    console.log("¡Evento de alumno salió recibido!", evento);
+
+                    // 1. Restar 1 al contador asegurando que no baje de 0
+                    let contador = document.getElementById('contador-alumnos');
+                    let valorActual = parseInt(contador.innerText) || 0;
+                    if (valorActual > 0) {
+                        contador.innerText = valorActual - 1;
+                    }
+
+                    // 2. Remover al alumno de la lista visual
+                    let lista = document.getElementById('lista-alumnos');
+                    Array.from(lista.children).forEach(li => {
+                        if (li.innerText.trim() === evento.nombreAlumno.trim()) {
+                            li.remove();
+                        }
+                    });
+                });
+        } else {
+            console.error("Laravel Echo no está disponible. Asegúrate de compilar con 'npm run dev'.");
+        }
     </script>
 
 </body>

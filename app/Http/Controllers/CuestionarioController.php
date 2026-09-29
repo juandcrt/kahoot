@@ -25,20 +25,33 @@ class CuestionarioController extends Controller
             'tipo' => 'manual',
         ]);
 
-        // 2. Guardar preguntas y opciones enviadas desde el formulario dinámico
+        // 2. Guardar preguntas, tiempos, imágenes opcionales y opciones enviadas desde el formulario dinámico
         if ($request->has('preguntas')) {
-            foreach ($request->preguntas as $pData) {
+            foreach ($request->preguntas as $index => $pData) {
+                
+                $rutaImagen = null;
+
+                // Verificar si se subió una imagen para esta pregunta específica
+                if ($request->hasFile("preguntas.{$index}.imagen")) {
+                    $file = $request->file("preguntas.{$index}.imagen");
+                    $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+                    // Guarda la imagen en storage/app/public/preguntas
+                    $rutaImagen = $file->storeAs('preguntas', $filename, 'public');
+                }
+
                 $pregunta = Pregunta::create([
                     'cuestionario_id' => $cuestionario->id,
                     'pregunta' => $pData['texto'] ?? 'Pregunta sin texto',
+                    'imagen' => $rutaImagen,
+                    'tiempo' => $pData['tiempo'] ?? 20, // Tiempo por defecto de 20 segundos si no se define
                 ]);
 
                 if (isset($pData['opciones'])) {
-                    foreach ($pData['opciones'] as $index => $opcionTexto) {
+                    foreach ($pData['opciones'] as $indexOpcion => $opcionTexto) {
                         Opcion::create([
                             'pregunta_id' => $pregunta->id,
                             'opcion' => $opcionTexto,
-                            'es_correcta' => ($index == 0), // La primera opción es correcta por defecto
+                            'es_correcta' => ($indexOpcion == 0), // La primera opción es correcta por defecto (puedes ajustarlo según tu vista)
                         ]);
                     }
                 }

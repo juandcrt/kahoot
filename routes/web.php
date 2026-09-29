@@ -7,6 +7,9 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\SalaJuego;
+use App\Events\AlumnoUnido;
+use App\Events\AlumnoSalio;
+use App\Events\PartidaIniciada;
 
 // 1. Ruta principal: Selector de roles
 Route::get('/', function () {
@@ -58,6 +61,18 @@ Route::middleware(['auth', 'verified'])->prefix('dashboard/profesor')->group(fun
         return view('proyectar.proyectar_sala', compact('sala'));
     })->name('profesor.proyectar');
 
+    // RUTA PARA INICIAR EL JUEGO: Cambia el estado y avisa a los alumnos por WebSockets
+    Route::post('/sala/{id}/iniciar', function ($id) {
+        $sala = SalaJuego::findOrFail($id);
+        
+        $sala->estado = 'en_curso';
+        $sala->save();
+
+        broadcast(new PartidaIniciada($sala->pin));
+
+        return redirect()->route('profesor.proyectar', $id);
+    })->name('profesor.iniciar');
+
     // RUTA LIMPIA: Apunta al método destroy del SalaController
     Route::delete('/salas/{id}', [SalaController::class, 'destroy'])->name('salas.destruir');
 });
@@ -83,24 +98,65 @@ Route::middleware(['auth', 'verified'])->prefix('dashboard/estudiante')->group(f
     Route::get('/skins', function () {
         return view('skins.index');
     })->name('estudiante.skins');
+
+    // RUTA DE JUEGO DEL ESTUDIANTE
+    Route::get('/juego/{pin}', function ($pin) {
+        $sala = SalaJuego::with(['cuestionario.preguntas.opcions'])->where('pin', $pin)->firstOrFail();
+        $preguntas = $sala->cuestionario->preguntas;
+
+        return view('Interfaz_estudiante.juego', compact('sala', 'preguntas'));
+    })->name('estudiante.juego');
+
+    // RUTA PARA REGISTRAR LA RESPUESTA DEL ESTUDIANTE (VÍA AJAX)
+    Route::post('/responder', function (Request $request) {
+        $esCorrecta = $request->input('es_correcta');
+        
+        return response()->json([
+            'status' => 'success',
+            'es_correcta' => $esCorrecta,
+            'mensaje' => $esCorrecta ? '¡Respuesta correcta!' : 'Respuesta incorrecta'
+        ]);
+    })->name('estudiante.responder');
 });
 
-// RUTA CORREGIDA: Registra al alumno y le pasa la sala a la vista
+// RUTA DE UNIÓN: Permite registrar al alumno si la sala está activa o en curso
 Route::post('/estudiante/unirse', function (Request $request) {
     $pin = $request->input('pin');
-    $sala = SalaJuego::where('pin', $pin)->where('estado', 'activa')->first();
+    $sala = SalaJuego::where('pin', $pin)->whereIn('estado', ['activa', 'en_curso'])->first();
 
     if (!$sala) {
         return back()->withErrors(['pin' => 'El PIN ingresado no es válido o la sala está cerrada.']);
     }
 
-    // REGISTRA AL USUARIO REAL EN LA SALA
+    // 1. REGISTRA AL USUARIO EN LA SALA
     $sala->usuarios()->syncWithoutDetaching([Auth::id()]);
+
+    // 2. DISPARA EL EVENTO EN TIEMPO REAL HACIA EL PROYECTOR (ENTRADA)
+    $nombreAlumno = Auth::user()->name ?? Auth::user()->nickname ?? 'Estudiante';
+    broadcast(new AlumnoUnido($nombreAlumno, $pin));
 
     return view('Interfaz_estudiante.sala_activa', compact('sala'));
 })->middleware(['auth', 'verified'])->name('estudiante.unirse');
 
-// RUTA API AÑADIDA: Devuelve el total de conectados para el profesor
+// RUTA DE SALIDA: Desvincula al estudiante y avisa al proyector en tiempo real
+Route::post('/estudiante/salir', function (Request $request) {
+    $pin = $request->input('pin');
+    $sala = SalaJuego::where('pin', $pin)->first();
+
+    if ($sala) {
+        $nombreAlumno = Auth::user()->name ?? Auth::user()->nickname ?? 'Estudiante';
+        
+        // 1. Desvincula al usuario de la sala en la base de datos
+        $sala->usuarios()->detach(Auth::id());
+
+        // 2. Dispara el evento en tiempo real hacia el proyector (SALIDA)
+        broadcast(new AlumnoSalio($nombreAlumno, $pin));
+    }
+
+    return redirect()->route('dashboard.estudiante');
+})->middleware(['auth', 'verified'])->name('estudiante.salir');
+
+// RUTA API: Devuelve el total de conectados para el profesor
 Route::get('/api/sala/{id}/participantes', function ($id) {
     $sala = SalaJuego::with('usuarios')->findOrFail($id);
 
