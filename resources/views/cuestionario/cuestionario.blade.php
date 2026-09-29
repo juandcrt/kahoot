@@ -151,6 +151,23 @@
             background: rgba(255, 255, 255, 0.05); border-left: 4px solid var(--kahoot-gold);
             padding: 12px 15px; border-radius: 8px; margin-bottom: 12px; font-size: 14px;
         }
+
+        /* ESTILO PERSONALIZADO PARA INPUT FILE (BOTÓN UNIFICADO) */
+        .custom-file-upload {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        .custom-file-upload:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
     </style>
 </head>
 <body>
@@ -168,14 +185,14 @@
 
         <div class="glass-card">
             <h2 style="font-size: 26px; font-weight: 800; margin-bottom: 5px;">Configura tu Evaluación</h2>
-            <p style="color: rgba(255,255,255,0.7); font-size: 14px; margin-bottom: 25px;">Diseña preguntas interactivas con tiempo y soporte de imágenes por cada área académica.</p>
+            <p style="color: rgba(255,255,255,0.7); font-size: 14px; margin-bottom: 25px;">Diseña preguntas interactivas con tiempo detallado y soporte visual por cada área académica.</p>
 
             <div class="tab-buttons">
                 <button type="button" class="tab-btn active" onclick="switchTab('manual')">✍️ Manual (Formulario)</button>
                 <button type="button" class="tab-btn" onclick="switchTab('archivo')">📁 Subir Excel o PDF</button>
             </div>
 
-            <!-- FORMULARIO MANUAL CONECTADO A BASE DE DATOS (CON MULTIPART PARA IMÁGENES) -->
+            <!-- FORMULARIO MANUAL CONECTADO A BASE DE DATOS -->
             <div id="tab-manual" class="tab-content active">
                 <form action="{{ route('cuestionario.store') }}" method="POST" enctype="multipart/form-data">
                     @csrf
@@ -197,21 +214,34 @@
                                 <input type="text" name="preguntas[0][texto]" class="form-input" placeholder="Ej. ¿Cuál es el valor de sen(30°)?" required>
                             </div>
 
-                            <!-- CAMPO DE TIEMPO PERSONALIZABLE -->
-                            <div class="form-group" style="display: flex; gap: 15px; align-items: center;">
-                                <div style="flex: 1;">
-                                    <label class="form-label" style="font-size: 13px;">Tiempo límite (segundos)</label>
-                                    <input type="number" name="preguntas[0][tiempo]" class="form-input" value="20" min="5" max="300" required>
-                                </div>
-                                <div style="flex: 2; font-size: 12px; color: rgba(255,255,255,0.6); padding-top: 20px;">
-                                    💡 Sugerencia: 20s para letras/inglés, 60s+ para matemática/física.
+                            <!-- TIEMPO EN MINUTOS Y SEGUNDOS -->
+                            <div class="form-group">
+                                <label class="form-label" style="font-size: 13px;">Tiempo límite por pregunta</label>
+                                <div style="display: flex; gap: 15px; align-items: center;">
+                                    <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                                        <input type="number" name="preguntas[0][minutos]" class="form-input" value="0" min="0" max="10" required style="text-align: center;">
+                                        <span style="font-size: 14px; font-weight: 600;">min</span>
+                                    </div>
+                                    <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                                        <input type="number" name="preguntas[0][segundos]" class="form-input" value="30" min="0" max="59" required style="text-align: center;">
+                                        <span style="font-size: 14px; font-weight: 600;">seg</span>
+                                    </div>
                                 </div>
                             </div>
 
-                            <!-- CAMPO DE IMAGEN OPCIONAL (Fórmulas, Textos de Comunicación, Esquemas) -->
+                            <!-- IMAGEN OPCIONAL CON PREVISUALIZACIÓN REAL (SIN TEXTO DE RUTA) -->
                             <div class="form-group">
                                 <label class="form-label" style="font-size: 13px;">Imagen opcional (Fórmula, lectura, esquema)</label>
-                                <input type="file" name="preguntas[0][imagen]" accept="image/png, image/jpeg, image/jpg" class="form-input" style="padding: 9px; cursor: pointer;">
+                                <div style="margin-bottom: 10px;">
+                                    <label class="custom-file-upload">
+                                        📁 Seleccionar imagen
+                                        <input type="file" name="preguntas[0][imagen]" accept="image/png, image/jpeg, image/jpg" style="display: none;" onchange="previewImage(event, 0)">
+                                    </label>
+                                </div>
+                                <!-- Contenedor de previsualización de imagen -->
+                                <div id="image-preview-container-0" style="display: none; margin-top: 10px;">
+                                    <img id="image-preview-0" src="" alt="Previsualización" style="max-height: 150px; border-radius: 10px; border: 2px solid rgba(255,255,255,0.2);">
+                                </div>
                             </div>
 
                             <label class="form-label" style="font-size: 13px; margin-top: 15px;">Opciones de Respuesta (La 1ra es correcta por defecto)</label>
@@ -284,11 +314,13 @@
 
         let questionIndex = 0;
 
-        // Función para agregar una nueva tarjeta de pregunta con tiempo e imagen dinámica
+        // Función para agregar tarjeta de pregunta con minutos, segundos y previsualización real de imagen
         function addQuestion() {
             questionIndex++;
             const cardId = 'q-card-' + questionIndex;
             const optionsId = 'options-' + questionIndex;
+            const previewContainerId = 'image-preview-container-' + questionIndex;
+            const previewImgId = 'image-preview-' + questionIndex;
 
             const container = document.getElementById('questions-container');
             const card = document.createElement('div');
@@ -305,19 +337,31 @@
                     <input type="text" name="preguntas[${questionIndex}][texto]" class="form-input" placeholder="Pregunta sin título" required>
                 </div>
 
-                <div class="form-group" style="display: flex; gap: 15px; align-items: center;">
-                    <div style="flex: 1;">
-                        <label class="form-label" style="font-size: 13px;">Tiempo límite (segundos)</label>
-                        <input type="number" name="preguntas[${questionIndex}][tiempo]" class="form-input" value="20" min="5" max="300" required>
-                    </div>
-                    <div style="flex: 2; font-size: 12px; color: rgba(255,255,255,0.6); padding-top: 20px;">
-                        💡 20s para letras, 60s+ para matemática.
+                <div class="form-group">
+                    <label class="form-label" style="font-size: 13px;">Tiempo límite por pregunta</label>
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                            <input type="number" name="preguntas[${questionIndex}][minutos]" class="form-input" value="0" min="0" max="10" required style="text-align: center;">
+                            <span style="font-size: 14px; font-weight: 600;">min</span>
+                        </div>
+                        <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                            <input type="number" name="preguntas[${questionIndex}][segundos]" class="form-input" value="30" min="0" max="59" required style="text-align: center;">
+                            <span style="font-size: 14px; font-weight: 600;">seg</span>
+                        </div>
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label class="form-label" style="font-size: 13px;">Imagen opcional (Fórmula, lectura, esquema)</label>
-                    <input type="file" name="preguntas[${questionIndex}][imagen]" accept="image/png, image/jpeg, image/jpg" class="form-input" style="padding: 9px; cursor: pointer;">
+                    <div style="margin-bottom: 10px;">
+                        <label class="custom-file-upload">
+                            📁 Seleccionar imagen
+                            <input type="file" name="preguntas[${questionIndex}][imagen]" accept="image/png, image/jpeg, image/jpg" style="display: none;" onchange="previewImage(event, ${questionIndex})">
+                        </label>
+                    </div>
+                    <div id="${previewContainerId}" style="display: none; margin-top: 10px;">
+                        <img id="${previewImgId}" src="" alt="Previsualización" style="max-height: 150px; border-radius: 10px; border: 2px solid rgba(255,255,255,0.2);">
+                    </div>
                 </div>
 
                 <label class="form-label" style="font-size: 13px; margin-top: 15px;">Opciones de Respuesta</label>
@@ -332,6 +376,24 @@
                 <button type="button" class="add-option-link" onclick="addOption(${questionIndex}, '${optionsId}')">+ Agregar opción</button>
             `;
             container.appendChild(card);
+        }
+
+        // Función para mostrar la previsualización real de la imagen seleccionada
+        function previewImage(event, index) {
+            const file = event.target.files[0];
+            const previewContainer = document.getElementById('image-preview-container-' + index);
+            const previewImg = document.getElementById('image-preview-' + index);
+
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImg.src = e.target.result;
+                    previewContainer.style.display = 'block';
+                }
+                reader.readAsDataURL(file);
+            } else {
+                previewContainer.style.display = 'none';
+            }
         }
 
         function removeQuestion(cardId) {
@@ -367,6 +429,7 @@
             }
         }
 
+        // Simulación completa de las 5 preguntas del Excel
         function handleFileSelect(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -384,7 +447,10 @@
 
             const realExcelQuestions = [
                 { q: "¿Cuál es tu rango de edad?", opciones: "Menos de 18, 18 - 25, 26 - 35, 36 - 45, 46 - 60, Más de 60" },
-                { q: "¿Cuál es tu género?", opciones: "Masculino, Femenino, Prefiero no decirlo, Otro" }
+                { q: "¿Cuál es tu género?", opciones: "Masculino, Femenino, Prefiero no decirlo, Otro" },
+                { q: "¿Cuál es tu nivel educativo más alto alcanzado?", opciones: "Educación primaria, Educación secundaria, Técnico/Superior, Universitario, Postgrado" },
+                { q: "¿Con qué frecuencia usas este producto/servicio?", opciones: "Nunca, Rara vez, A veces, Frecuentemente, Siempre" },
+                { q: "¿Qué tan satisfecho/a estás en general?", opciones: "Muy insatisfecho, Insatisfecho, Neutral, Satisfecho, Muy satisfecho" }
             ];
 
             realExcelQuestions.forEach((item, index) => {

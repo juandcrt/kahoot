@@ -25,7 +25,7 @@ class CuestionarioController extends Controller
             'tipo' => 'manual',
         ]);
 
-        // 2. Guardar preguntas, tiempos, imágenes opcionales y opciones enviadas desde el formulario dinámico
+        // 2. Guardar preguntas, tiempos convertidos a segundos, imágenes y opciones
         if ($request->has('preguntas')) {
             foreach ($request->preguntas as $index => $pData) {
                 
@@ -39,11 +39,20 @@ class CuestionarioController extends Controller
                     $rutaImagen = $file->storeAs('preguntas', $filename, 'public');
                 }
 
+                // Calcular el tiempo total en segundos combinando minutos y segundos
+                $minutos = isset($pData['minutos']) ? intval($pData['minutos']) : 0;
+                $segundos = isset($pData['segundos']) ? intval($pData['segundos']) : 30;
+                $tiempoTotalSegundos = ($minutos * 60) + $segundos;
+
+                if ($tiempoTotalSegundos <= 0) {
+                    $tiempoTotalSegundos = 30; // Valor por defecto si ambos están en 0
+                }
+
                 $pregunta = Pregunta::create([
                     'cuestionario_id' => $cuestionario->id,
                     'pregunta' => $pData['texto'] ?? 'Pregunta sin texto',
                     'imagen' => $rutaImagen,
-                    'tiempo' => $pData['tiempo'] ?? 20, // Tiempo por defecto de 20 segundos si no se define
+                    'tiempo' => $tiempoTotalSegundos,
                 ]);
 
                 if (isset($pData['opciones'])) {
@@ -51,7 +60,7 @@ class CuestionarioController extends Controller
                         Opcion::create([
                             'pregunta_id' => $pregunta->id,
                             'opcion' => $opcionTexto,
-                            'es_correcta' => ($indexOpcion == 0), // La primera opción es correcta por defecto (puedes ajustarlo según tu vista)
+                            'es_correcta' => ($indexOpcion == 0), // La primera opción es correcta por defecto
                         ]);
                     }
                 }
