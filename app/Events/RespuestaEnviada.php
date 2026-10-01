@@ -11,26 +11,26 @@ class RespuestaEnviada implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public $salaPin;
+    public $pin;
     public $userId;
     public $preguntaId;
-    public $points;
-    public $timeMs;
-    public $isCorrect;
+    public $puntos;
+    public $tiempoMs;
+    public $esCorrecta;
 
-    public function __construct($salaPin, $userId, $preguntaId, $points, $timeMs, $isCorrect)
+    public function __construct($pin, $userId, $preguntaId, $puntos, $tiempoMs, $esCorrecta)
     {
-        $this->salaPin = $salaPin;
+        $this->pin = $pin;
         $this->userId = $userId;
         $this->preguntaId = $preguntaId;
-        $this->points = $points;
-        $this->timeMs = $timeMs;
-        $this->isCorrect = $isCorrect;
+        $this->puntos = $puntos;
+        $this->tiempoMs = $tiempoMs;
+        $this->esCorrecta = $esCorrecta;
     }
 
     public function broadcastOn()
     {
-        return new Channel('sala.' . $this->salaPin);
+        return new Channel('sala.' . $this->pin);
     }
 
     public function broadcastAs(): string
