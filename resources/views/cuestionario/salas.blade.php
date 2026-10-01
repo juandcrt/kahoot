@@ -104,6 +104,16 @@
             box-shadow: 0 4px 0 #0a3870; transition: all 0.1s ease;
         }
         .kahoot-action-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #0a3870; }
+
+        .kahoot-edit-btn {
+            display: inline-flex; align-items: center; gap: 5px; text-align: center;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: white; font-weight: 700; font-size: 14px;
+            padding: 10px 15px; border-radius: 10px; text-decoration: none;
+            transition: background 0.2s;
+        }
+        .kahoot-edit-btn:hover { background: rgba(255, 255, 255, 0.22); }
     </style>
 </head>
 <body>
@@ -139,8 +149,14 @@
                             <h4 style="font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 5px;">{{ $sala->cuestionario->titulo ?? 'Cuestionario sin título' }}</h4>
                             <span style="font-size: 13px; color: rgba(255,255,255,0.6);">Estado: <strong style="color: #4ade80;">{{ ucfirst($sala->estado) }}</strong></span>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 15px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
                             <div class="pin-badge">{{ $sala->pin }}</div>
+                            
+                            <!-- ✏️ BOTÓN DE EDITAR CUESTIONARIO -->
+                            <a href="{{ route('profesor.cuestionario.edit', $sala->cuestionario_id) }}" class="kahoot-edit-btn" title="Editar Cuestionario">
+                                ✏️ Editar
+                            </a>
+
                             <a href="{{ route('profesor.proyectar', $sala->id) }}" class="kahoot-action-btn">Proyectar Sala</a>
                             
                             <!-- Botón de eliminar con la X -->

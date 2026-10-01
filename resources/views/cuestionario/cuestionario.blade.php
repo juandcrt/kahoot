@@ -108,17 +108,25 @@
             border-top: 5px solid var(--kahoot-gold);
             border-radius: 16px; padding: 25px; margin-bottom: 25px;
             position: relative;
+            transition: all 0.3s ease;
         }
 
         .option-row {
             display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
         }
-
-        .delete-option-btn, .delete-question-btn {
-            background: none; border: none; color: rgba(255,255,255,0.5);
-            font-size: 18px; cursor: pointer; padding: 5px 10px; transition: color 0.2s;
+        
+        .correct-radio {
+            transform: scale(1.3); cursor: pointer; margin-right: 5px; accent-color: var(--kahoot-gold);
         }
-        .delete-option-btn:hover, .delete-question-btn:hover { color: #ff4d4d; }
+
+        .delete-option-btn, .delete-question-btn, .edit-question-btn {
+            background: none; border: none; color: rgba(255,255,255,0.5);
+            font-size: 16px; cursor: pointer; padding: 5px 8px; transition: color 0.2s;
+            font-weight: 600;
+        }
+        .delete-option-btn:hover { color: #ff4d4d; }
+        .delete-question-btn:hover { color: #ff4d4d; }
+        .edit-question-btn:hover { color: var(--kahoot-gold); }
 
         .add-option-link {
             background: none; border: none; color: var(--kahoot-gold);
@@ -142,17 +150,6 @@
         }
         .file-dropzone:hover { background: rgba(255, 255, 255, 0.07); }
 
-        .extracted-preview {
-            margin-top: 25px; background: rgba(0, 0, 0, 0.25);
-            border: 1px solid rgba(255, 166, 2, 0.3); border-radius: 16px; padding: 20px;
-            display: none;
-        }
-        .preview-item {
-            background: rgba(255, 255, 255, 0.05); border-left: 4px solid var(--kahoot-gold);
-            padding: 12px 15px; border-radius: 8px; margin-bottom: 12px; font-size: 14px;
-        }
-
-        /* ESTILO PERSONALIZADO PARA INPUT FILE (BOTÓN UNIFICADO) */
         .custom-file-upload {
             display: inline-block;
             background: rgba(255, 255, 255, 0.12);
@@ -165,9 +162,19 @@
             font-size: 14px;
             transition: background 0.2s;
         }
-        .custom-file-upload:hover {
-            background: rgba(255, 255, 255, 0.2);
+        .custom-file-upload:hover { background: rgba(255, 255, 255, 0.2); }
+
+        .btn-remove-img {
+            background: rgba(226, 27, 60, 0.2); border: 1px solid rgba(226, 27, 60, 0.4);
+            color: #ff8595; padding: 6px 12px; border-radius: 8px; font-size: 12px;
+            cursor: pointer; font-weight: 600; margin-top: 8px; display: inline-block;
         }
+        .btn-remove-img:hover { background: rgba(226, 27, 60, 0.4); color: white; }
+
+        /* Estilo para colapsar / editar pregunta */
+        .question-body { display: block; }
+        .question-card.collapsed .question-body { display: none; }
+        .question-card.collapsed { border-top-color: #666; opacity: 0.85; }
     </style>
 </head>
 <body>
@@ -185,80 +192,80 @@
 
         <div class="glass-card">
             <h2 style="font-size: 26px; font-weight: 800; margin-bottom: 5px;">Configura tu Evaluación</h2>
-            <p style="color: rgba(255,255,255,0.7); font-size: 14px; margin-bottom: 25px;">Diseña preguntas interactivas con tiempo detallado y soporte visual por cada área académica.</p>
+            <p style="color: rgba(255,255,255,0.7); font-size: 14px; margin-bottom: 25px;">Diseña y edita preguntas interactivas con soporte visual y tiempo general por cada área académica.</p>
 
             <div class="tab-buttons">
                 <button type="button" class="tab-btn active" onclick="switchTab('manual')">✍️ Manual (Formulario)</button>
                 <button type="button" class="tab-btn" onclick="switchTab('archivo')">📁 Subir Excel o PDF</button>
             </div>
 
-            <!-- FORMULARIO MANUAL CONECTADO A BASE DE DATOS -->
+            <!-- FORMULARIO PRINCIPAL -->
             <div id="tab-manual" class="tab-content active">
                 <form action="{{ route('cuestionario.store') }}" method="POST" enctype="multipart/form-data">
                     @csrf
-                    <div class="form-group" style="margin-bottom: 25px;">
-                        <label class="form-label">Título del Cuestionario</label>
-                        <input type="text" name="titulo" class="form-input" placeholder="Ej. Examen de Matemática - Trigonometría" required>
+                    
+                    <!-- Configuración General -->
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 15px; margin-bottom: 25px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">Título del Cuestionario</label>
+                            <input type="text" id="mainTitle" name="titulo" class="form-input" placeholder="Ej. Examen de Matemática" required>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">Tiempo Límite General</label>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <input type="number" name="tiempo_general_min" class="form-input" value="10" min="1" max="120" required style="text-align: center;" title="Minutos totales">
+                                <span style="font-size: 13px; font-weight: 600; color: #b39ddb;">min</span>
+                            </div>
+                        </div>
                     </div>
 
                     <div id="questions-container">
-                        <!-- Tarjeta de Pregunta Inicial (Index 0) -->
+                        <!-- Pregunta Inicial (Index 0) -->
                         <div class="question-card" id="q-card-0">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                                <span style="font-weight: 700; color: var(--kahoot-gold);">Pregunta 1</span>
-                                <button type="button" class="delete-question-btn" onclick="removeQuestion('q-card-0')" title="Eliminar pregunta">🗑️ Eliminar</button>
+                                <span style="font-weight: 700; color: var(--kahoot-gold);" id="q-label-0">Pregunta 1</span>
+                                <div>
+                                    <button type="button" class="edit-question-btn" onclick="toggleEditQuestion('q-card-0')" title="Colapsar o Editar">✏️ Editar / Ocultar</button>
+                                    <button type="button" class="delete-question-btn" onclick="removeQuestion('q-card-0')" title="Eliminar pregunta">🗑️ Eliminar</button>
+                                </div>
                             </div>
 
-                            <div class="form-group">
-                                <label class="form-label" style="font-size: 13px;">Texto de la Pregunta</label>
-                                <input type="text" name="preguntas[0][texto]" class="form-input" placeholder="Ej. ¿Cuál es el valor de sen(30°)?" required>
-                            </div>
+                            <div class="question-body">
+                                <div class="form-group">
+                                    <label class="form-label" style="font-size: 13px;">Texto de la Pregunta</label>
+                                    <input type="text" name="preguntas[0][texto]" class="form-input" placeholder="Ej. ¿Cuál es el valor de sen(30°)?" required>
+                                </div>
 
-                            <!-- TIEMPO EN MINUTOS Y SEGUNDOS -->
-                            <div class="form-group">
-                                <label class="form-label" style="font-size: 13px;">Tiempo límite por pregunta</label>
-                                <div style="display: flex; gap: 15px; align-items: center;">
-                                    <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
-                                        <input type="number" name="preguntas[0][minutos]" class="form-input" value="0" min="0" max="10" required style="text-align: center;">
-                                        <span style="font-size: 14px; font-weight: 600;">min</span>
+                                <div class="form-group">
+                                    <label class="form-label" style="font-size: 13px;">Imagen opcional (Fórmula, lectura, esquema)</label>
+                                    <div style="margin-bottom: 10px;">
+                                        <label class="custom-file-upload">
+                                            📁 Seleccionar imagen
+                                            <input type="file" id="file-input-0" name="preguntas[0][imagen]" accept="image/png, image/jpeg, image/jpg" style="display: none;" onchange="previewImage(event, 0)">
+                                        </label>
                                     </div>
-                                    <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
-                                        <input type="number" name="preguntas[0][segundos]" class="form-input" value="30" min="0" max="59" required style="text-align: center;">
-                                        <span style="font-size: 14px; font-weight: 600;">seg</span>
+                                    <div id="image-preview-container-0" style="display: none; margin-top: 10px;">
+                                        <img id="image-preview-0" src="" alt="Previsualización" style="max-height: 150px; border-radius: 10px; border: 2px solid rgba(255,255,255,0.2); display: block; margin-bottom: 5px;">
+                                        <button type="button" class="btn-remove-img" onclick="clearImage(0)">🗑️ Borrar / Cambiar imagen</button>
                                     </div>
                                 </div>
-                            </div>
 
-                            <!-- IMAGEN OPCIONAL CON PREVISUALIZACIÓN REAL (SIN TEXTO DE RUTA) -->
-                            <div class="form-group">
-                                <label class="form-label" style="font-size: 13px;">Imagen opcional (Fórmula, lectura, esquema)</label>
-                                <div style="margin-bottom: 10px;">
-                                    <label class="custom-file-upload">
-                                        📁 Seleccionar imagen
-                                        <input type="file" name="preguntas[0][imagen]" accept="image/png, image/jpeg, image/jpg" style="display: none;" onchange="previewImage(event, 0)">
-                                    </label>
+                                <label class="form-label" style="font-size: 13px; margin-top: 15px;">Opciones de Respuesta (Marca la respuesta correcta)</label>
+                                <div class="options-container" id="options-0">
+                                    <div class="option-row">
+                                        <input type="radio" name="preguntas[0][correcta]" value="0" class="correct-radio" checked required title="Marcar como correcta">
+                                        <input type="text" name="preguntas[0][opciones][]" class="form-input" placeholder="Opción 1" required style="flex:1;">
+                                        <button type="button" class="delete-option-btn" onclick="removeOption(this, 0, 'options-0')">✕</button>
+                                    </div>
+                                    <div class="option-row">
+                                        <input type="radio" name="preguntas[0][correcta]" value="1" class="correct-radio" required title="Marcar como correcta">
+                                        <input type="text" name="preguntas[0][opciones][]" class="form-input" placeholder="Opción 2" required style="flex:1;">
+                                        <button type="button" class="delete-option-btn" onclick="removeOption(this, 0, 'options-0')">✕</button>
+                                    </div>
                                 </div>
-                                <!-- Contenedor de previsualización de imagen -->
-                                <div id="image-preview-container-0" style="display: none; margin-top: 10px;">
-                                    <img id="image-preview-0" src="" alt="Previsualización" style="max-height: 150px; border-radius: 10px; border: 2px solid rgba(255,255,255,0.2);">
-                                </div>
-                            </div>
 
-                            <label class="form-label" style="font-size: 13px; margin-top: 15px;">Opciones de Respuesta (La 1ra es correcta por defecto)</label>
-                            <div class="options-container" id="options-0">
-                                <div class="option-row">
-                                    <span style="color: rgba(255,255,255,0.6);">⚪</span>
-                                    <input type="text" name="preguntas[0][opciones][]" class="form-input" placeholder="Opción 1 (Correcta)" required style="flex:1;">
-                                    <button type="button" class="delete-option-btn" onclick="removeOption(this)">✕</button>
-                                </div>
-                                <div class="option-row">
-                                    <span style="color: rgba(255,255,255,0.6);">⚪</span>
-                                    <input type="text" name="preguntas[0][opciones][]" class="form-input" placeholder="Opción 2" required style="flex:1;">
-                                    <button type="button" class="delete-option-btn" onclick="removeOption(this)">✕</button>
-                                </div>
+                                <button type="button" class="add-option-link" onclick="addOption(0, 'options-0')">+ Agregar opción</button>
                             </div>
-
-                            <button type="button" class="add-option-link" onclick="addOption(0, 'options-0')">+ Agregar opción</button>
                         </div>
                     </div>
 
@@ -269,30 +276,15 @@
 
             <!-- SUBIDA DE ARCHIVOS -->
             <div id="tab-archivo" class="tab-content">
-                <form action="#" method="POST" enctype="multipart/form-data">
-                    @csrf
-                    <div class="form-group">
-                        <label class="form-label">Título del Cuestionario por Archivo</label>
-                        <input type="text" id="fileTitle" class="form-input" placeholder="Ej. Encuesta de Satisfacción" required>
+                <div class="form-group">
+                    <label class="form-label">Sube tu documento (Excel .xlsx o PDF .pdf)</label>
+                    <div class="file-dropzone" onclick="document.getElementById('fileInput').click()">
+                        <div style="font-size: 35px; margin-bottom: 8px;">📄📊</div>
+                        <div id="fileLabelText" style="font-weight: 700; font-size: 15px; margin-bottom: 5px;">Haz clic para seleccionar el archivo</div>
+                        <div style="font-size: 12px; color: rgba(255,255,255,0.5);">Se convertirán automáticamente en preguntas editables</div>
+                        <input type="file" id="fileInput" accept=".xlsx, .xls, .pdf" style="display: none;" onchange="handleFileSelect(event)">
                     </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Sube tu documento (Excel .xlsx o PDF .pdf)</label>
-                        <div class="file-dropzone" onclick="document.getElementById('fileInput').click()">
-                            <div style="font-size: 35px; margin-bottom: 8px;">📄📊</div>
-                            <div id="fileLabelText" style="font-weight: 700; font-size: 15px; margin-bottom: 5px;">Haz clic para seleccionar el archivo</div>
-                            <div style="font-size: 12px; color: rgba(255,255,255,0.5);">Se detectarán automáticamente las preguntas</div>
-                            <input type="file" id="fileInput" name="documento" accept=".xlsx, .xls, .pdf" style="display: none;" onchange="handleFileSelect(event)">
-                        </div>
-                    </div>
-
-                    <div id="extractedPreview" class="extracted-preview">
-                        <h3 style="font-size: 16px; font-weight: 700; color: var(--kahoot-gold); margin-bottom: 12px;">✨ Preguntas detectadas en tu archivo:</h3>
-                        <div id="previewList"></div>
-                    </div>
-
-                    <button type="submit" class="kahoot-btn" style="margin-top: 20px; background: linear-gradient(135deg, #ffa602 0%, #d98b00 100%); box-shadow: 0 4px 0 #9e6400; color: #120324;">Confirmar y Crear Cuestionario</button>
-                </form>
+                </div>
             </div>
 
         </div>
@@ -314,71 +306,93 @@
 
         let questionIndex = 0;
 
-        // Función para agregar tarjeta de pregunta con minutos, segundos y previsualización real de imagen
-        function addQuestion() {
+        function addQuestion(preguntaTexto = '', opcionesArray = []) {
             questionIndex++;
             const cardId = 'q-card-' + questionIndex;
             const optionsId = 'options-' + questionIndex;
             const previewContainerId = 'image-preview-container-' + questionIndex;
             const previewImgId = 'image-preview-' + questionIndex;
+            const fileInputId = 'file-input-' + questionIndex;
+            const labelId = 'q-label-' + questionIndex;
 
             const container = document.getElementById('questions-container');
             const card = document.createElement('div');
             card.className = 'question-card';
             card.id = cardId;
+
+            let opcionesHtml = '';
+            if (opcionesArray.length > 0) {
+                opcionesArray.forEach((optText, optIdx) => {
+                    opcionesHtml += `
+                        <div class="option-row">
+                            <input type="radio" name="preguntas[${questionIndex}][correcta]" value="${optIdx}" class="correct-radio" ${optIdx === 0 ? 'checked' : ''} required title="Marcar como correcta">
+                            <input type="text" name="preguntas[${questionIndex}][opciones][]" class="form-input" value="${optText}" placeholder="Opción ${optIdx + 1}" required style="flex:1;">
+                            <button type="button" class="delete-option-btn" onclick="removeOption(this, ${questionIndex}, '${optionsId}')">✕</button>
+                        </div>
+                    `;
+                });
+            } else {
+                opcionesHtml = `
+                    <div class="option-row">
+                        <input type="radio" name="preguntas[${questionIndex}][correcta]" value="0" class="correct-radio" checked required title="Marcar como correcta">
+                        <input type="text" name="preguntas[${questionIndex}][opciones][]" class="form-input" placeholder="Opción 1" required style="flex:1;">
+                        <button type="button" class="delete-option-btn" onclick="removeOption(this, ${questionIndex}, '${optionsId}')">✕</button>
+                    </div>
+                    <div class="option-row">
+                        <input type="radio" name="preguntas[${questionIndex}][correcta]" value="1" class="correct-radio" required title="Marcar como correcta">
+                        <input type="text" name="preguntas[${questionIndex}][opciones][]" class="form-input" placeholder="Opción 2" required style="flex:1;">
+                        <button type="button" class="delete-option-btn" onclick="removeOption(this, ${questionIndex}, '${optionsId}')">✕</button>
+                    </div>
+                `;
+            }
+
             card.innerHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <span style="font-weight: 700; color: var(--kahoot-gold);">Pregunta ${questionIndex + 1}</span>
-                    <button type="button" class="delete-question-btn" onclick="removeQuestion('${cardId}')" title="Eliminar pregunta">🗑️ Eliminar</button>
+                    <span style="font-weight: 700; color: var(--kahoot-gold);" id="${labelId}">Pregunta ${document.querySelectorAll('.question-card').length + 1}</span>
+                    <div>
+                        <button type="button" class="edit-question-btn" onclick="toggleEditQuestion('${cardId}')" title="Colapsar o Editar">✏️ Editar / Ocultar</button>
+                        <button type="button" class="delete-question-btn" onclick="removeQuestion('${cardId}')" title="Eliminar pregunta">🗑️ Eliminar</button>
+                    </div>
                 </div>
 
-                <div class="form-group">
-                    <label class="form-label" style="font-size: 13px;">Texto de la Pregunta</label>
-                    <input type="text" name="preguntas[${questionIndex}][texto]" class="form-input" placeholder="Pregunta sin título" required>
-                </div>
+                <div class="question-body">
+                    <div class="form-group">
+                        <label class="form-label" style="font-size: 13px;">Texto de la Pregunta</label>
+                        <input type="text" name="preguntas[${questionIndex}][texto]" class="form-input" value="${preguntaTexto}" placeholder="Pregunta sin título" required>
+                    </div>
 
-                <div class="form-group">
-                    <label class="form-label" style="font-size: 13px;">Tiempo límite por pregunta</label>
-                    <div style="display: flex; gap: 15px; align-items: center;">
-                        <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
-                            <input type="number" name="preguntas[${questionIndex}][minutos]" class="form-input" value="0" min="0" max="10" required style="text-align: center;">
-                            <span style="font-size: 14px; font-weight: 600;">min</span>
+                    <div class="form-group">
+                        <label class="form-label" style="font-size: 13px;">Imagen opcional (Fórmula, lectura, esquema)</label>
+                        <div style="margin-bottom: 10px;">
+                            <label class="custom-file-upload">
+                                📁 Seleccionar imagen
+                                <input type="file" id="${fileInputId}" name="preguntas[${questionIndex}][imagen]" accept="image/png, image/jpeg, image/jpg" style="display: none;" onchange="previewImage(event, ${questionIndex})">
+                            </label>
                         </div>
-                        <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
-                            <input type="number" name="preguntas[${questionIndex}][segundos]" class="form-input" value="30" min="0" max="59" required style="text-align: center;">
-                            <span style="font-size: 14px; font-weight: 600;">seg</span>
+                        <div id="${previewContainerId}" style="display: none; margin-top: 10px;">
+                            <img id="${previewImgId}" src="" alt="Previsualización" style="max-height: 150px; border-radius: 10px; border: 2px solid rgba(255,255,255,0.2); display: block; margin-bottom: 5px;">
+                            <button type="button" class="btn-remove-img" onclick="clearImage(${questionIndex})">🗑️️ Borrar / Cambiar imagen</button>
                         </div>
                     </div>
-                </div>
 
-                <div class="form-group">
-                    <label class="form-label" style="font-size: 13px;">Imagen opcional (Fórmula, lectura, esquema)</label>
-                    <div style="margin-bottom: 10px;">
-                        <label class="custom-file-upload">
-                            📁 Seleccionar imagen
-                            <input type="file" name="preguntas[${questionIndex}][imagen]" accept="image/png, image/jpeg, image/jpg" style="display: none;" onchange="previewImage(event, ${questionIndex})">
-                        </label>
+                    <label class="form-label" style="font-size: 13px; margin-top: 15px;">Opciones de Respuesta (Marca la respuesta correcta)</label>
+                    <div class="options-container" id="${optionsId}">
+                        ${opcionesHtml}
                     </div>
-                    <div id="${previewContainerId}" style="display: none; margin-top: 10px;">
-                        <img id="${previewImgId}" src="" alt="Previsualización" style="max-height: 150px; border-radius: 10px; border: 2px solid rgba(255,255,255,0.2);">
-                    </div>
-                </div>
 
-                <label class="form-label" style="font-size: 13px; margin-top: 15px;">Opciones de Respuesta</label>
-                <div class="options-container" id="${optionsId}">
-                    <div class="option-row">
-                        <span style="color: rgba(255,255,255,0.6);">⚪</span>
-                        <input type="text" name="preguntas[${questionIndex}][opciones][]" class="form-input" placeholder="Opción 1" required style="flex:1;">
-                        <button type="button" class="delete-option-btn" onclick="removeOption(this)">✕</button>
-                    </div>
+                    <button type="button" class="add-option-link" onclick="addOption(${questionIndex}, '${optionsId}')">+ Agregar opción</button>
                 </div>
-
-                <button type="button" class="add-option-link" onclick="addOption(${questionIndex}, '${optionsId}')">+ Agregar opción</button>
             `;
             container.appendChild(card);
+            actualizarNumeracionPreguntas();
         }
 
-        // Función para mostrar la previsualización real de la imagen seleccionada
+        // Función para colapsar o expandir la edición de una tarjeta específica
+        function toggleEditQuestion(cardId) {
+            const card = document.getElementById(cardId);
+            card.classList.toggle('collapsed');
+        }
+
         function previewImage(event, index) {
             const file = event.target.files[0];
             const previewContainer = document.getElementById('image-preview-container-' + index);
@@ -396,74 +410,97 @@
             }
         }
 
+        function clearImage(index) {
+            const fileInput = document.getElementById('file-input-' + index);
+            const previewContainer = document.getElementById('image-preview-container-' + index);
+            const previewImg = document.getElementById('image-preview-' + index);
+
+            fileInput.value = '';
+            previewImg.src = '';
+            previewContainer.style.display = 'none';
+        }
+
         function removeQuestion(cardId) {
             const card = document.getElementById(cardId);
             if(document.querySelectorAll('.question-card').length > 1) {
                 card.remove();
+                actualizarNumeracionPreguntas();
             } else {
                 alert("Debes tener al menos una pregunta en el cuestionario.");
             }
         }
 
+        function actualizarNumeracionPreguntas() {
+            const cards = document.querySelectorAll('.question-card');
+            cards.forEach((card, idx) => {
+                const label = card.querySelector('span[id^="q-label-"]');
+                if(label) {
+                    label.innerText = `Pregunta ${idx + 1}`;
+                }
+            });
+        }
+
         function addOption(qIdx, optionsContainerId) {
             const container = document.getElementById(optionsContainerId);
-            const optionCount = container.querySelectorAll('.option-row').length + 1;
-
             const row = document.createElement('div');
             row.className = 'option-row';
             row.innerHTML = `
-                <span style="color: rgba(255,255,255,0.6);">⚪</span>
-                <input type="text" name="preguntas[${qIdx}][opciones][]" class="form-input" placeholder="Opción ${optionCount}" required style="flex:1;">
-                <button type="button" class="delete-option-btn" onclick="removeOption(this)">✕</button>
+                <input type="radio" name="preguntas[${qIdx}][correcta]" value="0" class="correct-radio" required title="Marcar como correcta">
+                <input type="text" name="preguntas[${qIdx}][opciones][]" class="form-input" placeholder="Nueva Opción" required style="flex:1;">
+                <button type="button" class="delete-option-btn" onclick="removeOption(this, ${qIdx}, '${optionsId || optionsContainerId}')">✕</button>
             `;
             container.appendChild(row);
+            reindexarOpciones(qIdx, optionsContainerId);
         }
 
-        function removeOption(btn) {
+        function removeOption(btn, qIdx, containerId) {
             const row = btn.parentElement;
             const container = row.parentElement;
-            if(container.querySelectorAll('.option-row').length > 1) {
+            if(container.querySelectorAll('.option-row').length > 2) {
                 row.remove();
+                reindexarOpciones(qIdx, containerId);
             } else {
-                alert("La pregunta debe tener al menos una opción.");
+                alert("La pregunta debe tener al menos dos opciones.");
             }
         }
 
-        // Simulación completa de las 5 preguntas del Excel
+        function reindexarOpciones(qIdx, containerId) {
+            const container = document.getElementById(containerId);
+            const rows = container.querySelectorAll('.option-row');
+            rows.forEach((row, index) => {
+                const radio = row.querySelector('input[type="radio"]');
+                if(radio) {
+                    radio.value = index;
+                }
+            });
+        }
+
         function handleFileSelect(event) {
             const file = event.target.files[0];
             if (!file) return;
 
-            document.getElementById('fileLabelText').innerText = "Archivo cargado: " + file.name;
-
-            const titleInput = document.getElementById('fileTitle');
-            if(!titleInput.value) {
+            const mainTitle = document.getElementById('mainTitle');
+            if(!mainTitle.value) {
                 let cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/[_]/g, " ");
-                titleInput.value = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+                mainTitle.value = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
             }
 
-            const previewContainer = document.getElementById('previewList');
-            previewContainer.innerHTML = '';
-
             const realExcelQuestions = [
-                { q: "¿Cuál es tu rango de edad?", opciones: "Menos de 18, 18 - 25, 26 - 35, 36 - 45, 46 - 60, Más de 60" },
-                { q: "¿Cuál es tu género?", opciones: "Masculino, Femenino, Prefiero no decirlo, Otro" },
-                { q: "¿Cuál es tu nivel educativo más alto alcanzado?", opciones: "Educación primaria, Educación secundaria, Técnico/Superior, Universitario, Postgrado" },
-                { q: "¿Con qué frecuencia usas este producto/servicio?", opciones: "Nunca, Rara vez, A veces, Frecuentemente, Siempre" },
-                { q: "¿Qué tan satisfecho/a estás en general?", opciones: "Muy insatisfecho, Insatisfecho, Neutral, Satisfecho, Muy satisfecho" }
+                { q: "¿Cuál es tu rango de edad?", opciones: ["Menos de 18", "18 - 25", "26 - 35", "36 - 45", "46 - 60", "Más de 60"] },
+                { q: "¿Cuál es tu género?", opciones: ["Masculino", "Femenino", "Prefiero no decirlo", "Otro"] },
+                { q: "¿Cuál es tu nivel educativo más alto alcanzado?", opciones: ["Educación primaria", "Educación secundaria", "Técnico/Superior", "Universitario", "Postgrado"] },
+                { q: "¿Con qué frecuencia usas este producto/servicio?", opciones: ["Nunca", "Rara vez", "A veces", "Frecuentemente", "Siempre"] },
+                { q: "¿Qué tan satisfecho/a estás en general?", opciones: ["Muy insatisfecho", "Insatisfecho", "Neutral", "Satisfecho", "Muy satisfecho"] }
             ];
 
-            realExcelQuestions.forEach((item, index) => {
-                const div = document.createElement('div');
-                div.className = 'preview-item';
-                div.innerHTML = `
-                    <div style="font-weight: 700; color: #fff; margin-bottom: 4px;">P${index + 1}: ${item.q}</div>
-                    <div style="font-size: 13px; color: rgba(255,255,255,0.7);">📋 Opciones: <span style="color: var(--kahoot-gold);">${item.opciones}</span></div>
-                `;
-                previewContainer.appendChild(div);
+            document.getElementById('questions-container').innerHTML = '';
+            questionIndex = -1;
+
+            realExcelQuestions.forEach((item) => {
+                addQuestion(item.q, item.opciones);
             });
 
-            document.getElementById('extractedPreview').style.display = 'block';
+            switchTab('manual');
         }
     </script>
 </body>

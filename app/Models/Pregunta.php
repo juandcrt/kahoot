@@ -9,5 +9,18 @@ class Pregunta extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['cuestionario_id', 'pregunta'];
+    protected $fillable = [
+        'cuestionario_id', 
+        'pregunta', 
+        'imagen', 
+        'tiempo'
+    ];
+
+    /**
+     * Relación con las opciones de respuesta de la pregunta.
+     */
+    public function opciones()
+    {
+        return $this->hasMany(Opcion::class);
+    }
 }
