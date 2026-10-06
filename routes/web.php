@@ -14,7 +14,7 @@ use App\Models\Pregunta;
 use App\Events\AlumnoUnido;
 use App\Events\AlumnoSalio;
 use App\Events\PartidaIniciada;
-use App\Events\RespuestaEnviada; // CORREGIDO AQUÍ
+use App\Events\RespuestaEnviada;
 use App\Models\StudentFeedback;
 use App\Jobs\GenerateAiFeedback;
 use App\Events\PartidaFinalizada;
@@ -70,7 +70,7 @@ Route::middleware(['auth', 'verified'])->prefix('dashboard/profesor')->group(fun
         return redirect()->route('profesor.proyectar', $id);
     })->name('profesor.iniciar');
 
-    // RUTA DEL PODIO (INDEPENDIENTE DE SI LOS ALUMNOS SALEN DE LA SALA)
+    // RUTA DEL PODIO CON TODAS LAS RESPUESTAS PARA EL EXCEL
     Route::get('/sala/{id}/podio', function ($id) {
         $user = Auth::user();
         if ($user->role !== 'docente' && $user->role !== 'admin') {
@@ -84,35 +84,41 @@ Route::middleware(['auth', 'verified'])->prefix('dashboard/profesor')->group(fun
             broadcast(new PartidaFinalizada($sala->pin));
         }
 
-        $userIds = RespuestaEstudiante::where('sala_juego_id', $sala->id)
-            ->distinct()
-            ->pluck('user_id');
-
+        $userIds = RespuestaEstudiante::where('sala_juego_id', $sala->id)->distinct()->pluck('user_id');
         $alumnosParticipantes = \App\Models\User::whereIn('id', $userIds)->get();
 
-        $resultados = $alumnosParticipantes->map(function ($alumno) use ($sala) {
-            $respuestas = RespuestaEstudiante::where('sala_juego_id', $sala->id)
-                ->where('user_id', $alumno->id)->get();
+        // Obtenemos todas las respuestas de la sala para cruzar en la vista del podio (Excel)
+        $todasLasRespuestas = RespuestaEstudiante::where('sala_juego_id', $sala->id)->get();
+
+        $resultados = $alumnosParticipantes->map(function ($alumno) use ($sala, $todasLasRespuestas) {
+            $respuestas = $todasLasRespuestas->where('user_id', $alumno->id);
 
             $puntajeTotal = 0; $correctas = 0; $tiempoTotal = 0;
             foreach ($respuestas as $respuesta) {
+                $tiempoReal = abs($respuesta->tiempo_respuesta_segundos);
                 if ($respuesta->es_correcta) {
                     $correctas++;
-                    $penalizacion = $respuesta->tiempo_respuesta_segundos * 15; 
+                    $penalizacion = $tiempoReal * 15; 
                     $puntos = max(500, 1000 - $penalizacion);
                     $puntajeTotal += $puntos;
                 }
-                $tiempoTotal += $respuesta->tiempo_respuesta_segundos;
+                $tiempoTotal += $tiempoReal;
             }
+
+            $minutos = floor($tiempoTotal / 60);
+            $segundos = round($tiempoTotal - ($minutos * 60));
+            $textoTiempo = $minutos > 0 ? "{$minutos} min {$segundos} s" : "{$segundos} s";
+
             return [
+                'user_id' => $alumno->id,
                 'nombre' => $alumno->name ?? $alumno->nickname ?? 'Estudiante',
                 'puntaje' => $puntajeTotal,
                 'correctas' => $correctas,
-                'tiempo_promedio' => $respuestas->count() > 0 ? round($tiempoTotal / $respuestas->count(), 1) : 0
+                'tiempo_formateado' => $textoTiempo
             ];
         })->sortByDesc('puntaje')->values();
 
-        return view('proyectar.podio', compact('sala', 'resultados'));
+        return view('proyectar.podio', compact('sala', 'resultados', 'todasLasRespuestas'));
     })->name('profesor.podio');
 
     Route::get('/sala/{id}/finalizar', function ($id) {
@@ -157,7 +163,7 @@ Route::middleware(['auth', 'verified'])->prefix('dashboard/profesor')->group(fun
                         'nombre' => $r->user->name ?? $r->user->nickname ?? 'Estudiante',
                         'correcta' => (bool) $r->es_correcta,
                         'marco' => $op->opcion ?? '—',
-                        'tiempo' => round($r->tiempo_respuesta_segundos, 1),
+                        'tiempo' => round(abs($r->tiempo_respuesta_segundos), 1),
                     ];
                 })->sortBy('tiempo')->values(),
                 'opciones' => $p->opciones->map(fn($o) => [
@@ -215,7 +221,7 @@ Route::middleware(['auth', 'verified'])->prefix('dashboard/estudiante')->group(f
         $request->validate([
             'pin' => 'required',
             'pregunta_id' => 'required|exists:preguntas,id',
-            'opcion_id' => 'required|exists:opciones,id',
+            'opcion_id' => 'required|exists:opcions,id',
         ]);
 
         $pin = $request->pin;
@@ -228,7 +234,9 @@ Route::middleware(['auth', 'verified'])->prefix('dashboard/estudiante')->group(f
 
         $cacheKey = "sala_{$sala->id}_user_{$userId}_pregunta_{$pregunta->id}";
         $inicio = Cache::get($cacheKey) ?? now()->subSeconds($pregunta->tiempo ?? 30);
-        $tiempoMs = now()->diffInMilliseconds($inicio);
+        
+        $inicioCarbon = \Carbon\Carbon::parse($inicio);
+        $tiempoMs = abs(now()->diffInMilliseconds($inicioCarbon));
         $tiempoSegundos = $tiempoMs / 1000;
 
         $puntos = 0;
@@ -250,8 +258,7 @@ Route::middleware(['auth', 'verified'])->prefix('dashboard/estudiante')->group(f
             ]
         );
 
-        // DISPARAR EL EVENTO CON LAS VARIABLES COINCIDENTES
-        broadcast(new RespuestaEnviada($pin, $userId, $request->pregunta_id, $puntos, $tiempoMs, $esCorrecta));
+        event(new RespuestaEnviada($pin, $userId, $request->pregunta_id, $puntos, $tiempoMs, $esCorrecta));
 
         return response()->json([
             'status' => 'success',
@@ -261,7 +268,6 @@ Route::middleware(['auth', 'verified'])->prefix('dashboard/estudiante')->group(f
         ]);
     })->name('estudiante.responder');
 
-    // RUTA DE RESULTADOS PARA LA IA
     Route::get('/resultados/{sala_id}', function ($sala_id) {
         $user = Auth::user();
         $sala = SalaJuego::with('cuestionario.preguntas')->findOrFail($sala_id);
@@ -274,11 +280,16 @@ Route::middleware(['auth', 'verified'])->prefix('dashboard/estudiante')->group(f
         $correctas = 0;
         $incorrectas = 0;
         $datosParaIA = [];
+        $todasLasPreguntas = $sala->cuestionario->preguntas;
 
         foreach ($respuestas as $res) {
+            $pregAsociada = $todasLasPreguntas->firstWhere('id', $res->pregunta_id);
+            $res->texto_pregunta = $pregAsociada ? $pregAsociada->pregunta : 'Pregunta eliminada';
+
             if ($res->es_correcta) {
                 $correctas++;
-                $penalizacion = $res->tiempo_respuesta_segundos * 15;
+                $tiempoReal = abs($res->tiempo_respuesta_segundos);
+                $penalizacion = $tiempoReal * 15;
                 $puntajeTotal += max(500, 1000 - $penalizacion);
             } else {
                 $incorrectas++;
@@ -287,7 +298,7 @@ Route::middleware(['auth', 'verified'])->prefix('dashboard/estudiante')->group(f
             $datosParaIA[] = [
                 'pregunta_id' => $res->pregunta_id,
                 'correcta' => (bool)$res->es_correcta,
-                'tiempo_usado_segundos' => $res->tiempo_respuesta_segundos
+                'tiempo_usado_segundos' => abs($res->tiempo_respuesta_segundos)
             ];
         }
 
@@ -300,7 +311,7 @@ Route::middleware(['auth', 'verified'])->prefix('dashboard/estudiante')->group(f
             GenerateAiFeedback::dispatch($feedback->id, $datosParaIA);
         }
 
-        return view('Interfaz_estudiante.resultados', compact('sala', 'puntajeTotal', 'correctas', 'incorrectas', 'feedback'));
+        return view('Interfaz_estudiante.resultados', compact('sala', 'puntajeTotal', 'correctas', 'incorrectas', 'feedback', 'respuestas'));
     })->name('estudiante.resultados');
 });
 

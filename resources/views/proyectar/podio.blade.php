@@ -72,7 +72,7 @@
                         <th>Pos</th>
                         <th>Alumno</th>
                         <th>Aciertos</th>
-                        <th>Tiempo Prom.</th>
+                        <th>Cronómetro</th>
                         <th>Puntos Totales</th>
                     </tr>
                 </thead>
@@ -82,18 +82,70 @@
                         <td style="font-weight: 800; color: {{ $index === 0 ? '#FFD700' : ($index === 1 ? '#C0C0C0' : ($index === 2 ? '#CD7F32' : 'white')) }};">#{{ $index + 1 }}</td>
                         <td>{{ $res['nombre'] }}</td>
                         <td>{{ $res['correctas'] }} / {{ $sala->cuestionario->preguntas->count() }}</td>
-                        <td>{{ $res['tiempo_promedio'] }} s</td>
+                        <td>{{ $res['tiempo_formateado'] }}</td>
                         <td style="color: var(--kahoot-gold); font-weight: 800;">{{ $res['puntaje'] }}</td>
                     </tr>
                     @endforeach
                 </tbody>
             </table>
             
-            <div style="display: flex; justify-content: center; gap: 20px;">
-                <a href="{{ route('profesor.dashboard', $sala->id) }}" class="btn-home" style="background: white; color: #2a0b5c;">Ver Estadísticas Detalladas 📊</a>
+            <div style="display: flex; justify-content: center; gap: 20px; align-items: center;">
+                <button onclick="exportarReporteExcel()" class="btn-home" style="background: #26890c; color: white;">📥 Descargar Excel</button>
                 <a href="{{ route('dashboard.profesor') }}" class="btn-home">Volver al Panel de Control</a>
             </div>
         </div>
     </div>
+
+    <!-- TABLA OCULTA PARA EXCEL -->
+    <table id="tablaExcel" style="display: none;">
+        <thead>
+            <tr>
+                <th colspan="{{ count($sala->cuestionario->preguntas) + 1 }}" style="font-size: 18px; font-weight: bold; background-color: #2a0b5c; color: #ffffff; text-align: center; height: 40px; vertical-align: middle;">
+                    Reporte de Resultados: {{ $sala->cuestionario->titulo }}
+                </th>
+            </tr>
+            <tr>
+                <th style="background-color: #ffa602; color: #000000; font-weight: bold; border: 1px solid #000000; width: 220px; text-align: left; height: 25px; vertical-align: middle;">Alumno</th>
+                @foreach($sala->cuestionario->preguntas as $index => $pregunta)
+                    <th style="background-color: #ffa602; color: #000000; font-weight: bold; border: 1px solid #000000; width: 110px; text-align: center; vertical-align: middle;">Pregunta {{ $index + 1 }}</th>
+                @endforeach
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($resultados as $res)
+                <tr>
+                    <td style="border: 1px solid #000000; text-align: left; font-weight: bold; height: 22px; vertical-align: middle;">{{ $res['nombre'] }}</td>
+                    @foreach($sala->cuestionario->preguntas as $pregunta)
+                        @php
+                            $respuesta = $todasLasRespuestas->where('user_id', $res['user_id'])->where('pregunta_id', $pregunta->id)->first();
+                            $simbolo = $respuesta ? ($respuesta->es_correcta ? '✔ Correcto' : '✘ Incorrecto') : '-';
+                            $bgColor = $respuesta ? ($respuesta->es_correcta ? '#c8e6c9' : '#ffcdd2') : '#ffffff';
+                            $textColor = $respuesta ? ($respuesta->es_correcta ? '#2e7d32' : '#c62828') : '#000000';
+                        @endphp
+                        <td style="border: 1px solid #000000; text-align: center; background-color: {{ $bgColor }}; color: {{ $textColor }}; font-weight: bold; vertical-align: middle;">
+                            {{ $simbolo }}
+                        </td>
+                    @endforeach
+                </tr>
+            @endforeach
+        </tbody>
+    </table>
+
+    <script>
+        function exportarReporteExcel() {
+            let tabla = document.getElementById("tablaExcel");
+            let html = tabla.outerHTML;
+            let uri = 'data:application/vnd.ms-excel;base64,';
+            let template = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"></head><body>{table}</body></html>';
+            let base64 = function(s) { return window.btoa(unescape(encodeURIComponent(s))) };
+            let format = function(s, c) { return s.replace(/{(\w+)}/g, function(m, p) { return c[p]; }) };
+
+            let ctx = {worksheet: 'Resultados', table: html};
+            let link = document.createElement("a");
+            link.download = "Reporte_Kahoot_{{ $sala->pin }}.xls";
+            link.href = uri + base64(format(template, ctx));
+            link.click();
+        }
+    </script>
 </body>
 </html>

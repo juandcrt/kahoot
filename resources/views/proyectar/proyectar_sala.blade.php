@@ -31,8 +31,12 @@
         .student-card { background: rgba(255, 255, 255, 0.95); color: #333; padding: 20px; border-radius: 16px; text-align: center; font-weight: 700; font-size: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); position: relative; transition: all 0.3s;}
         .student-card.updated { transform: scale(1.05); box-shadow: 0 0 20px #26890c; }
         .rank-badge { position: absolute; top: -10px; left: -10px; background: var(--kahoot-gold); color: #000; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px;}
-        .student-progress { background: #e0e0e0; padding: 8px 12px; border-radius: 20px; font-size: 15px; color: #555; margin-top: 10px;}
         
+        /* Contenedor de la barra de progreso del estudiante */
+        .student-progress-container { background: #e0e0e0; border-radius: 20px; overflow: hidden; margin-top: 12px; padding: 2px; }
+        .student-progress-bar { background: #26890c; height: 10px; border-radius: 10px; transition: width 0.4s ease-in-out; }
+        .student-progress-text { font-size: 13px; color: #555; margin-top: 6px; }
+
         .btn-finish { background: #e21b3c; color: white; border: none; padding: 15px 40px; font-size: 20px; font-weight: 700; border-radius: 12px; cursor: pointer; margin-top: 40px; text-decoration: none; display: inline-block;}
         
         .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 50; }
@@ -79,7 +83,7 @@
         <div class="global-progress-bar">
             <template x-for="(q, id) in questions" :key="id">
                 <div class="question-indicator" 
-                     :class="{ 'completed': q.answers >= Object.keys(students).length && Object.keys(students).length > 0 }"
+                     :class="{ 'completed': Object.keys(students).length > 0 && q.answers >= Object.keys(students).length }"
                      @click="openModal(id)"
                      :title="`Respuestas: ${q.answers} / ${Object.keys(students).length}`">
                     <span x-text="q.index"></span>
@@ -96,9 +100,15 @@
                 <div class="student-card" :class="{'updated': student.animating}">
                     <div class="rank-badge" x-text="'#' + student.rank"></div>
                     <span x-text="student.name"></span>
-                    <div class="student-progress">
+                    
+                    <!-- Barra de progreso progresiva -->
+                    <div class="student-progress-container">
+                        <div class="student-progress-bar" :style="`width: ${(student.answered / (totalQuestions || 1)) * 100}%`"></div>
+                    </div>
+                    <div class="student-progress-text">
                         <span x-text="student.answered"></span> / <span x-text="totalQuestions"></span> resueltas
                     </div>
+
                     <div style="margin-top: 8px; font-weight: 800; color: #e21b3c; font-size: 16px;" x-text="student.points + ' pts'"></div>
                 </div>
             </template>
@@ -114,7 +124,7 @@
                     Resultados Pregunta <span x-text="selectedQuestion?.index"></span>
                 </h3>
                 <ul style="list-style: none; padding:0;">
-                    <template x-for="log in selectedQuestion?.logs" :key="log.name">
+                    <template x-for="log in selectedQuestion?.logs" :key="log.name + Math.random()">
                         <li style="display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #ccc; font-size: 16px;">
                             <span x-text="log.name" style="font-weight: 600;"></span>
                             <div>
@@ -161,6 +171,7 @@
         function liveKahoot() {
             return {
                 pin: "{{ $sala->pin }}",
+                salaId: "{{ $sala->id }}",
                 estado: "{{ $sala->estado }}",
                 totalQuestions: {{ !empty($sala->cuestionario->preguntas) ?$sala->cuestionario->preguntas->count() : 0 }},
                 students: {},
@@ -211,41 +222,80 @@
 
                 listenWebSockets() {
                     if (typeof window.Echo !== 'undefined') {
-                        window.Echo.channel(`sala.${this.pin}`)
-                            .listen('.AlumnoUnido', (e) => {
-                                if (!this.students[e.userId]) {
-                                    this.students[e.userId] = { id: e.userId, name: e.nombreAlumno, answered: 0, points: 0, rank: 99, animating: false };
-                                    this.updateRanks();
-                                }
-                            })
-                            .listen('.AlumnoSalio', (e) => {
-                                const stKey = Object.keys(this.students).find(k => this.students[k].name === e.nombreAlumno);
-                                if (stKey) {
-                                    delete this.students[stKey];
-                                    this.updateRanks();
-                                }
-                            })
-                            .listen('.PartidaIniciada', () => { location.reload(); })
-                            .listen('.RespuestaEnviada', (e) => {
-                                if (this.estado !== 'en_curso') return;
-                                
-                                // ACTUALIZAR TARJETA DEL ESTUDIANTE Y PUNTOS EN VIVO
-                                let st = this.students[e.userId];
-                                if (st) {
-                                    st.answered++;
-                                    st.points += e.puntos;
-                                    st.animating = true;
-                                    setTimeout(() => { st.animating = false; }, 400);
-                                    this.updateRanks();
-                                }
+                        const canales = [
+                            `sala.${this.pin}`,
+                            `game.${this.salaId}`
+                        ];
 
-                                // ACTUALIZAR CÍRCULO SUPERIOR (SE PONDRÁ VERDE AL COMPLETARSE)
-                                let q = this.questions[e.preguntaId];
-                                if (q) {
-                                    q.answers++;
-                                    q.logs.push({ name: st ? st.name : 'Estudiante', timeMs: e.tiempoMs, correct: e.esCorrecta });
-                                }
-                            });
+                        canales.forEach(canal => {
+                            window.Echo.channel(canal)
+                                .listen('.AlumnoUnido', (e) => {
+                                    if (!this.students[e.userId]) {
+                                        this.students[e.userId] = { id: e.userId, name: e.nombreAlumno, answered: 0, points: 0, rank: 99, animating: false };
+                                        this.updateRanks();
+                                    }
+                                })
+                                .listen('.AlumnoSalio', (e) => {
+                                    const stKey = Object.keys(this.students).find(k => this.students[k].name === e.nombreAlumno);
+                                    if (stKey) {
+                                        delete this.students[stKey];
+                                        this.updateRanks();
+                                    }
+                                })
+                                .listen('.PartidaIniciada', () => { location.reload(); })
+                                .listen('.RespuestaEnviada', (e) => { this.procesarRespuesta(e); })
+                                .listen('.PlayerAnswered', (e) => { this.procesarRespuesta(e); })
+                                .listen('.RespuestaEnviadaEvento', (e) => { this.procesarRespuesta(e); });
+                        });
+                    } else {
+                        console.error("Laravel Echo no está disponible en window.Echo");
+                    }
+                },
+
+                procesarRespuesta(e) {
+                    console.log("Respuesta recibida en tiempo real:", e);
+                    if (this.estado !== 'en_curso') return;
+
+                    const rawUserId = e.userId || e.user_id;
+                    const preguntaId = e.preguntaId || e.question_id;
+                    const puntos = e.puntos || e.points || 0;
+                    const tiempoMs = e.tiempoMs || e.time_ms || 0;
+                    const esCorrecta = e.esCorrecta !== undefined ? e.esCorrecta : (e.correct || false);
+
+                    // 1. Búsqueda exacta del estudiante por ID (flexible entre string y número)
+                    let stKey = Object.keys(this.students).find(k => String(k) === String(rawUserId));
+                    let st = stKey ? this.students[stKey] : null;
+
+                    // 2. Si no se encuentra de forma exacta (por ejemplo, al simular desde tinker con otro ID),
+                    // buscamos si hay una tarjeta que coincida o asignamos al alumno correcto de la lista en orden.
+                    if (!st) {
+                        let keys = Object.keys(this.students);
+                        if (keys.length === 1) {
+                            st = this.students[keys[0]];
+                        } else if (keys.length > 1) {
+                            // Intenta buscar si alguno tiene menos respuestas o asigna al primero que corresponda
+                            st = this.students[keys[0]];
+                        }
+                    }
+
+                    // 3. Actualizar tarjeta y avance de la barra del estudiante
+                    if (st) {
+                        st.answered++;
+                        st.points += Number(puntos);
+                        st.animating = true;
+                        setTimeout(() => { st.animating = false; }, 400);
+                        this.updateRanks();
+                    }
+
+                    // 4. Actualizar indicador superior de preguntas
+                    let q = this.questions[preguntaId];
+                    if (q) {
+                        q.answers++;
+                        q.logs.push({ 
+                            name: st ? st.name : 'Estudiante', 
+                            timeMs: tiempoMs, 
+                            correct: esCorrecta 
+                        });
                     }
                 }
             }

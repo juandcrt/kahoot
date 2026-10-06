@@ -28,13 +28,28 @@ class RespuestaEnviada implements ShouldBroadcastNow
         $this->esCorrecta = $esCorrecta;
     }
 
-    public function broadcastOn()
+    public function broadcastOn(): array
     {
-        return new Channel('sala.' . $this->pin);
+        return [
+            new Channel('sala.' . $this->pin)
+        ];
     }
 
     public function broadcastAs(): string
     {
         return 'RespuestaEnviada';
+    }
+
+    public function broadcastWith(): array
+    {
+        return [
+            'userId' => $this->userId,
+            'user_id' => $this->userId,
+            'preguntaId' => $this->preguntaId,
+            'pregunta_id' => $this->preguntaId,
+            'puntos' => $this->puntos,
+            'tiempoMs' => $this->tiempoMs,
+            'esCorrecta' => $this->esCorrecta,
+        ];
     }
 }
