@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Hash;
+use App\Models\User;
 use App\Models\SalaJuego;
 use App\Models\RespuestaEstudiante;
 use App\Models\Opcion;
@@ -18,6 +20,21 @@ use App\Events\RespuestaEnviada;
 use App\Models\StudentFeedback;
 use App\Jobs\GenerateAiFeedback;
 use App\Events\PartidaFinalizada;
+
+// Función global para calcular el Bimestre dinámicamente según el calendario de Tungasuca
+function obtenerBimestreActual() {
+    $fecha = \Carbon\Carbon::now();
+    $mes = $fecha->month;
+    $dia = $fecha->day;
+
+    if (($mes == 3) || $mes == 4 || ($mes == 5 && $dia <= 12)) return 'I Bimestre';
+    if (($mes == 5 && $dia >= 13) || $mes == 6 || ($mes == 7 && $dia <= 21)) return 'II Bimestre';
+    if (($mes == 7 && $dia >= 22) || ($mes == 8 && $dia <= 4)) return 'Vacaciones';
+    if (($mes == 8 && $dia >= 5) || $mes == 9 || ($mes == 10 && $dia <= 13)) return 'III Bimestre';
+    if (($mes == 10 && $dia >= 14) || $mes == 11 || $mes == 12) return 'IV Bimestre';
+    
+    return 'Fuera de periodo';
+}
 
 // 1. Ruta principal: Selector de roles
 Route::get('/', function () {
@@ -70,7 +87,7 @@ Route::middleware(['auth', 'verified'])->prefix('dashboard/profesor')->group(fun
         return redirect()->route('profesor.proyectar', $id);
     })->name('profesor.iniciar');
 
-    // RUTA DEL PODIO CON TODAS LAS RESPUESTAS PARA EL EXCEL
+    // RUTA DEL PODIO CON TODAS LAS RESPUESTAS PARA EL EXCEL Y BIMESTRE
     Route::get('/sala/{id}/podio', function ($id) {
         $user = Auth::user();
         if ($user->role !== 'docente' && $user->role !== 'admin') {
@@ -89,8 +106,11 @@ Route::middleware(['auth', 'verified'])->prefix('dashboard/profesor')->group(fun
 
         // Obtenemos todas las respuestas de la sala para cruzar en la vista del podio (Excel)
         $todasLasRespuestas = RespuestaEstudiante::where('sala_juego_id', $sala->id)->get();
+        
+        // Calculamos el bimestre actual de forma automática
+        $bimestreActual = obtenerBimestreActual();
 
-        $resultados = $alumnosParticipantes->map(function ($alumno) use ($sala, $todasLasRespuestas) {
+        $resultados = $alumnosParticipantes->map(function ($alumno) use ($sala, $todasLasRespuestas, $bimestreActual) {
             $respuestas = $todasLasRespuestas->where('user_id', $alumno->id);
 
             $puntajeTotal = 0; $correctas = 0; $tiempoTotal = 0;
@@ -108,12 +128,21 @@ Route::middleware(['auth', 'verified'])->prefix('dashboard/profesor')->group(fun
             $minutos = floor($tiempoTotal / 60);
             $segundos = round($tiempoTotal - ($minutos * 60));
             $textoTiempo = $minutos > 0 ? "{$minutos} min {$segundos} s" : "{$segundos} s";
+            
+            $porcentaje = $sala->cuestionario->preguntas->count() > 0 
+                ? round(($correctas / $sala->cuestionario->preguntas->count()) * 100) 
+                : 0;
 
             return [
                 'user_id' => $alumno->id,
-                'nombre' => $alumno->name ?? $alumno->nickname ?? 'Estudiante',
+                'nombre' => $alumno->name ?? 'N/A',
+                'apellidos' => $alumno->apellidos ?? '-',
+                'dni' => $alumno->dni ?? '-',
+                'grado_seccion' => $alumno->grado_seccion ?? '-',
+                'bimestre' => $bimestreActual,
                 'puntaje' => $puntajeTotal,
                 'correctas' => $correctas,
+                'porcentaje' => $porcentaje,
                 'tiempo_formateado' => $textoTiempo
             ];
         })->sortByDesc('puntaje')->values();
@@ -189,6 +218,55 @@ Route::middleware(['auth', 'verified'])->prefix('dashboard/profesor')->group(fun
     })->name('profesor.dashboard');
 
     Route::delete('/salas/{id}', [SalaController::class, 'destroy'])->name('salas.destruir');
+
+    // =========================================================
+    // MÓDULO DE GESTIÓN DE USUARIOS (NUEVO)
+    // =========================================================
+    Route::get('/usuarios', function () {
+        if (Auth::user()->role !== 'admin' && Auth::user()->role !== 'docente') {
+            abort(403);
+        }
+        $usuarios = \App\Models\User::latest()->get();
+        $bimestreActual = obtenerBimestreActual();
+        return view('Interfaz_profesor.usuarios', compact('usuarios', 'bimestreActual'));
+    })->name('profesor.usuarios');
+
+    Route::post('/usuarios/crear', function (Request $request) {
+        if (Auth::user()->role !== 'admin' && Auth::user()->role !== 'docente') {
+            abort(403);
+        }
+        
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'apellidos' => 'required|string|max:255',
+            'dni' => 'required|string|max:15|unique:users,dni',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|min:6',
+            'role' => 'required|in:estudiante,docente,admin',
+        ]);
+
+        \App\Models\User::create([
+            'name' => $request->name,
+            'apellidos' => $request->apellidos,
+            'dni' => $request->dni,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+            'role' => $request->role,
+            'grado_seccion' => $request->grado_seccion ?? null,
+            // El bimestre no se guarda en BD, se calcula en vivo siempre
+        ]);
+
+        return back()->with('success', 'Usuario registrado correctamente.');
+    })->name('profesor.usuarios.crear');
+
+    Route::delete('/usuarios/eliminar/{id}', function ($id) {
+        if (Auth::user()->role !== 'admin' && Auth::user()->role !== 'docente') {
+            abort(403);
+        }
+        \App\Models\User::findOrFail($id)->delete();
+        return back()->with('success', 'Usuario eliminado exitosamente.');
+    })->name('profesor.usuarios.eliminar');
+
 });
 
 // 3. Dashboard Estudiante y Rutas de Juego
@@ -349,7 +427,9 @@ Route::get('/api/sala/{id}/participantes', function ($id) {
 
 Route::get('/dashboard', function () {
     $user = Auth::user();
-    if ($user->role === 'docente' || $user->role === 'admin') return redirect()->route('dashboard.profesor');
+    if ($user->role === 'docente' || $user->role === 'admin') {
+        return redirect()->route('dashboard.profesor');
+    }
     return redirect()->route('dashboard.estudiante');
 })->middleware(['auth', 'verified'])->name('dashboard');
 

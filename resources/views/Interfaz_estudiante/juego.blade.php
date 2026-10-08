@@ -100,7 +100,7 @@
         const salaPin = '{{ $sala->pin }}';
         const salaId = '{{ $sala->id }}';
         const preguntas = @json($preguntasData);
-        let tiempoRestante = {{ $tiempoGlobal }};
+        let tiempoRestante = {{ $sala->cuestionario->tiempo_general_min ?? 10 }} * 60;
         let indiceActual = 0;
         let tiempoInicioPregunta = 0;
         let temporizadorInterval;

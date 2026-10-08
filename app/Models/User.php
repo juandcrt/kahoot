@@ -23,6 +23,9 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'apellidos',     // Agregado
+        'dni',           // Agregado
+        'grado_seccion', // Agregado
     ];
 
     /**
